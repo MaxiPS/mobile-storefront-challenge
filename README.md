@@ -55,6 +55,27 @@ Vite prints the local development URL in the terminal.
   fixtures; automated tests do not depend on the live service.
 - Source code, comments, and commit messages are written in English.
 
+## API contract and fixtures
+
+The API base URL is `https://itx-frontend-test.onrender.com/api`. A manual
+inspection on 2026-10-22 observed the following responses:
+
+- `GET /product` returns an array of products with `id`, `brand`, `model`,
+  `price`, and `imgUrl`. All observed values are strings; `price` can be an
+  empty string.
+- `GET /product/:id` returns the same base fields plus technical specifications.
+  Variant choices are in `options.colors` and `options.storages`, each with a
+  numeric `code` and string `name`. The API also returns the field names
+  `dimentions` and `secondaryCmera` as spelled.
+- `POST /cart` is implemented with the `{ id, colorCode, storageCode }` payload.
+  Its response is expected to include `count` as described in the assessment;
+  it was not called against the live service to avoid changing remote cart data.
+
+Small samples from the observed GET responses are stored in
+`tests/fixtures/products.json` and `tests/fixtures/product-detail.json`. The
+automated `productsApi` tests mock `fetch`, including the cart response, and do
+not make requests to the live API.
+
 This scaffold provides the runnable application foundation and a smoke test.
 The product list, detail page, local cache, and cart behavior are subsequent
 implementation milestones.
