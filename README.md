@@ -48,9 +48,13 @@ Vite prints the local development URL in the terminal.
 ## Design and architecture
 
 - shadcn/ui components are added to the repository and can be adjusted in place.
-- Product data and the cart count will persist locally through Dexie.
-- Product search will read from the local database and will not call the API as
-  the search term changes.
+- Dexie caches product list and detail GET responses for one hour and persists
+  the cart count in IndexedDB.
+- If an API refresh fails after a cache entry expires, the cache service returns
+  the locally stored response with `isStale: true` so the view can identify it.
+- The product repository stores normalized brand and model fields for local
+  partial search. Searching reads Dexie and does not call the API.
+- `appStore` exposes stable immutable snapshots through `useSyncExternalStore`.
 - Functional work follows Red–Green–Refactor with mocked API responses and
   fixtures; automated tests do not depend on the live service.
 - Source code, comments, and commit messages are written in English.
@@ -76,6 +80,6 @@ Small samples from the observed GET responses are stored in
 automated `productsApi` tests mock `fetch`, including the cart response, and do
 not make requests to the live API.
 
-This scaffold provides the runnable application foundation and a smoke test.
-The product list, detail page, local cache, and cart behavior are subsequent
-implementation milestones.
+The application foundation, API client, route skeleton, Dexie cache, and cart
+store are in place. The full product list and product detail experiences remain
+subsequent implementation milestones.
