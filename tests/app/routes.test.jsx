@@ -1,10 +1,22 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AppRoutes from "@/app/routes.jsx";
+import { getProducts } from "@/services/api/productsApi.js";
+import productsFixture from "../fixtures/products.json";
+
+vi.mock("@/services/api/productsApi.js", () => ({
+  addProductToCart: vi.fn(),
+  getProductById: vi.fn(),
+  getProducts: vi.fn(),
+}));
 
 afterEach(cleanup);
+
+beforeEach(() => {
+  getProducts.mockResolvedValue(productsFixture);
+});
 
 function renderRoutes(initialEntries) {
   return render(
@@ -44,11 +56,17 @@ describe("application routes", () => {
     const user = userEvent.setup();
     renderRoutes(["/"]);
 
-    await user.click(screen.getByRole("link", { name: "View sample product" }));
+    await user.click(
+      await screen.findByRole("link", {
+        name: "View Acer Iconia Talk S details",
+      }),
+    );
 
     expect(
       screen.getByRole("heading", { name: "Product details" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Product ID: demo-product")).toBeInTheDocument();
+    expect(
+      screen.getByText("Product ID: ZmGrkLRPXOTpxsU4jjAcv"),
+    ).toBeInTheDocument();
   });
 });

@@ -33,7 +33,9 @@ export function createProductsCache({
   now = () => Date.now(),
   ttlMs = CACHE_TTL_MS,
 } = {}) {
-  async function getProductsWithCache() {
+  let productsRequest;
+
+  async function loadProductsWithCache() {
     const checkedAt = now();
     const cachedEntry = await database.apiCache.get(PRODUCT_LIST_CACHE_KEY);
 
@@ -89,6 +91,16 @@ export function createProductsCache({
 
       throw error;
     }
+  }
+
+  function getProductsWithCache() {
+    if (!productsRequest) {
+      productsRequest = loadProductsWithCache().finally(() => {
+        productsRequest = undefined;
+      });
+    }
+
+    return productsRequest;
   }
 
   async function getProductDetailWithCache(id) {

@@ -2,8 +2,18 @@
 
 > A frontend technical assessment for Nunegal Consulting.
 
-Mobile Storefront is a React single-page application foundation for browsing
-mobile products, viewing product details, and adding items to a cart.
+Mobile Storefront is a React single-page application for browsing mobile
+products, viewing product details, and adding items to a cart. The product
+listing is implemented with local search backed by Dexie and IndexedDB.
+
+## Features
+
+- Browse responsive product cards with a maximum of four columns on wide screens.
+- Search product brands and models from the local IndexedDB database.
+- Revalidate the product list through the API only when the one-hour cache is
+  missing or expired; typing in the search field does not make API requests.
+- Keep the shared cart count hydrated from and persisted to IndexedDB.
+- Show loading, error, empty, no-results, and stale-cache states.
 
 ## At a glance
 
@@ -52,8 +62,9 @@ Vite prints the local development URL in the terminal.
   the cart count in IndexedDB.
 - If an API refresh fails after a cache entry expires, the cache service returns
   the locally stored response with `isStale: true` so the view can identify it.
-- The product repository stores normalized brand and model fields for local
-  partial search. Searching reads Dexie and does not call the API.
+- The product listing reads products through the cache service. Its search field
+  calls the product repository, which matches normalized brand and model fields
+  in Dexie without calling the API.
 - `appStore` exposes stable immutable snapshots through `useSyncExternalStore`.
 - Functional work follows Red–Green–Refactor with mocked API responses and
   fixtures; automated tests do not depend on the live service.
@@ -80,6 +91,6 @@ Small samples from the observed GET responses are stored in
 automated `productsApi` tests mock `fetch`, including the cart response, and do
 not make requests to the live API.
 
-The application foundation, API client, route skeleton, Dexie cache, and cart
-store are in place. The full product list and product detail experiences remain
-subsequent implementation milestones.
+The application foundation, API client, client-side routes, Dexie cache, cart
+store, and responsive product listing are implemented. The product detail
+experience and add-to-cart flow remain subsequent implementation milestones.
