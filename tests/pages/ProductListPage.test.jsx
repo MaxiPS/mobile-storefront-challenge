@@ -68,6 +68,7 @@ describe("product list page", () => {
       screen.getByRole("img", { name: "Acer Iconia Talk S" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Price unavailable")).toBeInTheDocument();
+    expect(screen.getByText("170 \u20ac")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Mobile Storefront home" }),
     ).toHaveAttribute("href", "/");

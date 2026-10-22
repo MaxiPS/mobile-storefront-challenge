@@ -549,6 +549,7 @@ button {
   display: grid;
   gap: 1.1rem;
   padding: 1.25rem;
+  margin-top: 1.5rem;
   background: #f8f9fb;
   border: 1px solid #e8ebef;
   border-radius: 0.9rem;
