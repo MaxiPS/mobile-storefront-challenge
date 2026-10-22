@@ -3,11 +3,9 @@ import { describe, expect, it } from "vitest";
 import App from "@/app/App.jsx";
 
 describe("App", () => {
-  it("renders the storefront scaffold", () => {
+  it("renders the product list at the root route", () => {
     render(<App />);
 
-    expect(
-      screen.getByRole("heading", { name: "Mobile Storefront" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Products" })).toBeInTheDocument();
   });
 });
