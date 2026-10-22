@@ -9,6 +9,8 @@ listing is implemented with local search backed by Dexie and IndexedDB.
 ## Features
 
 - Browse responsive product cards with a maximum of four columns on wide screens.
+- Open a product detail page with technical specifications and variant choices.
+- Add a selected product variant to the cart and sync the shared cart count.
 - Search product brands and models from the local IndexedDB database.
 - Revalidate the product list through the API only when the one-hour cache is
   missing or expired; typing in the search field does not make API requests.
@@ -92,5 +94,6 @@ automated `productsApi` tests mock `fetch`, including the cart response, and do
 not make requests to the live API.
 
 The application foundation, API client, client-side routes, Dexie cache, cart
-store, and responsive product listing are implemented. The product detail
-experience and add-to-cart flow remain subsequent implementation milestones.
+store, responsive product listing, product details, and add-to-cart flow are
+implemented. The remaining work is final visual review, accessibility checks,
+and delivery documentation.

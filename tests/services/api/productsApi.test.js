@@ -80,6 +80,21 @@ describe("productsApi", () => {
     );
   });
 
+  it("exposes a not-found HTTP status for missing product details", async () => {
+    fetchMock.mockResolvedValue(
+      createJsonResponse({}, { ok: false, status: 404 }),
+    );
+
+    const error = await getProductById("missing-product").catch((requestError) =>
+      requestError,
+    );
+
+    expect(error).toMatchObject({
+      message: "API request failed with status 404",
+      status: 404,
+    });
+  });
+
   it("preserves network errors from fetch", async () => {
     const networkError = new TypeError("Network unavailable");
     fetchMock.mockRejectedValue(networkError);

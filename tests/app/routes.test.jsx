@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AppRoutes from "@/app/routes.jsx";
-import { getProducts } from "@/services/api/productsApi.js";
+import { getProductById, getProducts } from "@/services/api/productsApi.js";
+import productDetailFixture from "../fixtures/product-detail.json";
 import productsFixture from "../fixtures/products.json";
 
 vi.mock("@/services/api/productsApi.js", () => ({
@@ -16,6 +17,7 @@ afterEach(cleanup);
 
 beforeEach(() => {
   getProducts.mockResolvedValue(productsFixture);
+  getProductById.mockResolvedValue(productDetailFixture);
 });
 
 function renderRoutes(initialEntries) {
@@ -33,13 +35,12 @@ describe("application routes", () => {
     expect(screen.getByRole("heading", { name: "Products" })).toBeInTheDocument();
   });
 
-  it("renders product details for the requested product ID", () => {
-    renderRoutes(["/products/demo-product"]);
+  it("renders product details for the requested product ID", async () => {
+    renderRoutes([`/products/${productDetailFixture.id}`]);
 
     expect(
-      screen.getByRole("heading", { name: "Product details" }),
+      await screen.findByRole("heading", { name: "Iconia Talk S" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Product ID: demo-product")).toBeInTheDocument();
   });
 
   it("renders a not-found page for unknown routes", () => {
@@ -63,10 +64,9 @@ describe("application routes", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "Product details" }),
+      await screen.findByRole("heading", { name: "Iconia Talk S" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText("Product ID: ZmGrkLRPXOTpxsU4jjAcv"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("CPU")).toBeInTheDocument();
+    expect(screen.getByText("Quad-core 1.3 GHz Cortex-A53")).toBeInTheDocument();
   });
 });

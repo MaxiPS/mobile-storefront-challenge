@@ -34,6 +34,7 @@ export function createProductsCache({
   ttlMs = CACHE_TTL_MS,
 } = {}) {
   let productsRequest;
+  const productDetailRequests = new Map();
 
   async function loadProductsWithCache() {
     const checkedAt = now();
@@ -103,7 +104,7 @@ export function createProductsCache({
     return productsRequest;
   }
 
-  async function getProductDetailWithCache(id) {
+  async function loadProductDetailWithCache(id) {
     const cacheKey = `/product/${id}`;
     const checkedAt = now();
     const cachedEntry = await database.apiCache.get(cacheKey);
@@ -153,6 +154,17 @@ export function createProductsCache({
 
       throw error;
     }
+  }
+
+  function getProductDetailWithCache(id) {
+    if (!productDetailRequests.has(id)) {
+      const request = loadProductDetailWithCache(id).finally(() => {
+        productDetailRequests.delete(id);
+      });
+      productDetailRequests.set(id, request);
+    }
+
+    return productDetailRequests.get(id);
   }
 
   return {
