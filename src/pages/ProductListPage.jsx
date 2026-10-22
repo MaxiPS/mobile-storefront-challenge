@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import AppHeader from "@/components/layout/AppHeader.jsx";
-import ProductGrid from "@/components/products/ProductGrid.jsx";
+import ProductResults from "@/components/products/ProductResults.jsx";
 import ProductSearch from "@/components/products/ProductSearch.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { productsCache } from "@/services/storage/cache.js";
@@ -122,36 +122,12 @@ export default function ProductListPage() {
         )}
 
         {status === "ready" && (
-          <section className="product-results" aria-label="Product results">
-            {isStale && (
-              <p className="stale-notice" role="status">
-                Showing saved products. The latest update is unavailable.
-              </p>
-            )}
-
-            {products.length === 0 ? (
-              <div className="product-state">
-                <h2>No products available</h2>
-                <p>There are no products to show right now.</p>
-              </div>
-            ) : isSearchPending ? (
-              <div className="product-state" role="status" aria-live="polite">
-                <p>Searching local products...</p>
-              </div>
-            ) : visibleProducts.length === 0 ? (
-              <div className="product-state">
-                <h2>No products found</h2>
-                <p>Try another brand or model name.</p>
-              </div>
-            ) : (
-              <>
-                <p className="product-results__count" aria-live="polite">
-                  {visibleProducts.length} {visibleProducts.length === 1 ? "product" : "products"}
-                </p>
-                <ProductGrid products={visibleProducts} />
-              </>
-            )}
-          </section>
+          <ProductResults
+            products={products}
+            visibleProducts={visibleProducts}
+            isSearchPending={isSearchPending}
+            isStale={isStale}
+          />
         )}
       </main>
     </div>

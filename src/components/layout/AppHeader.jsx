@@ -48,7 +48,7 @@ export default function AppHeader({ breadcrumbs = [] }) {
               const isCurrentPage = index === breadcrumbs.length - 1;
 
               return (
-                <Fragment key={`${breadcrumb.label}-${index}`}>
+                <Fragment key={breadcrumb.to ?? breadcrumb.label}>
                   {index > 0 && (
                     <BreadcrumbSeparator>
                       <ChevronRight aria-hidden="true" />
