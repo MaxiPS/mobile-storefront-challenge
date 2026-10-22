@@ -1,10 +1,18 @@
 const API_BASE_URL = "https://itx-frontend-test.onrender.com/api";
 
+export class ApiError extends Error {
+  constructor(status) {
+    super(`API request failed with status ${status}`);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 async function request(path, options) {
   const response = await fetch(`${API_BASE_URL}${path}`, options);
 
   if (!response.ok) {
-    throw new Error(`API request failed with status ${response.status}`);
+    throw new ApiError(response.status);
   }
 
   return response.json();
