@@ -67,6 +67,9 @@ describe("product details page", () => {
       await screen.findByRole("heading", { name: "Iconia Talk S" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Acer")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "Acer Iconia Talk S" }),
+    ).toHaveAttribute("src", productDetailFixture.imgUrl);
     expect(screen.getByText("170 \u20ac")).toBeInTheDocument();
     expect(screen.getByText("Quad-core 1.3 GHz Cortex-A53")).toBeInTheDocument();
     expect(screen.getByText("2 GB RAM")).toBeInTheDocument();
@@ -94,6 +97,44 @@ describe("product details page", () => {
     );
     expect(screen.getByRole("combobox", { name: "Storage" })).toHaveTextContent(
       "16 GB",
+    );
+  });
+
+  it("presents product specifications before purchase actions", async () => {
+    renderApplication();
+
+    await screen.findByRole("heading", { name: "Iconia Talk S" });
+
+    const specifications = screen.getByRole("heading", {
+      name: "Specifications",
+    });
+    const colorSelector = screen.getByRole("combobox", { name: "Color" });
+
+    expect(
+      specifications.compareDocumentPosition(colorSelector) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("omits the specifications section when optional details are unavailable", async () => {
+    getProductById.mockResolvedValueOnce({
+      id: productDetailFixture.id,
+      brand: "Acer",
+      model: "Iconia Talk S",
+      price: "170",
+      options: productDetailFixture.options,
+    });
+
+    renderApplication();
+
+    expect(
+      await screen.findByRole("heading", { name: "Iconia Talk S" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Specifications" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Color" })).toHaveTextContent(
+      "Black",
     );
   });
 

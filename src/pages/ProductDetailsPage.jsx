@@ -196,8 +196,6 @@ export default function ProductDetailsPage() {
                   {formatPrice(product.price)}
                 </p>
 
-                <ProductActions key={product.id} product={product} />
-
                 {specifications.length > 0 && (
                   <section
                     className="product-specifications"
@@ -214,6 +212,8 @@ export default function ProductDetailsPage() {
                     </dl>
                   </section>
                 )}
+
+                <ProductActions key={product.id} product={product} />
               </div>
             </section>
           </>
