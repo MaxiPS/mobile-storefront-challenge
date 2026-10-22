@@ -58,3 +58,4 @@ Vite prints the local development URL in the terminal.
 This scaffold provides the runnable application foundation and a smoke test.
 The product list, detail page, local cache, and cart behavior are subsequent
 implementation milestones.
+.
