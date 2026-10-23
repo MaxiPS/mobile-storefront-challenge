@@ -101,7 +101,6 @@ export default function ProductDetailsPage() {
   const product = currentResource.product;
   const specifications = product ? getSpecifications(product) : [];
   const breadcrumbItems = [
-    { label: "Home", to: "/" },
     { label: "Products", to: "/" },
     {
       label:

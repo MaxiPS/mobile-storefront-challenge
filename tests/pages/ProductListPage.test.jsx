@@ -104,6 +104,14 @@ describe("product list page", () => {
     render(<App />);
 
     expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
+    const productCardLink = screen.getByRole("link", {
+      name: "View Acer Iconia Talk S details",
+    });
+    expect(productCardLink).toHaveAttribute("href", `/products/${productsFixture[0].id}`);
+    expect(productCardLink).toContainElement(
+      screen.getByRole("heading", { name: "Iconia Talk S" }),
+    );
+    expect(screen.queryByText("View details", { exact: true })).not.toBeInTheDocument();
     expect(
       screen.getByRole("img", { name: "Acer Iconia Talk S" }),
     ).toBeInTheDocument();
