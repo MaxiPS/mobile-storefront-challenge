@@ -13,6 +13,7 @@ import { productListStore } from "@/store/productListStore.js";
 import productsFixture from "../fixtures/products.json";
 
 const PRODUCTS_URL = "https://itx-frontend-test.onrender.com/api/product";
+const INITIAL_VIEWPORT = { width: window.innerWidth, height: window.innerHeight };
 const server = setupServer(
   http.get(PRODUCTS_URL, () => HttpResponse.json(productsFixture)),
 );
@@ -31,6 +32,8 @@ afterEach(() => {
   cleanup();
   server.resetHandlers();
   vi.restoreAllMocks();
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: INITIAL_VIEWPORT.width });
+  Object.defineProperty(window, "innerHeight", { configurable: true, value: INITIAL_VIEWPORT.height });
 });
 
 function expectProductRequests(count) {
@@ -49,6 +52,27 @@ async function seedProductCache(products, expiresAt) {
     response: products,
     savedAt: expiresAt - 60_000,
     expiresAt,
+  });
+}
+
+function createProductCatalog(count) {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `test-product-${index + 1}`,
+    brand: "Test Brand",
+    model: `Product ${index + 1}`,
+    price: "100",
+    imgUrl: "",
+  }));
+}
+
+function setViewportSize(width, height) {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
+  Object.defineProperty(window, "innerHeight", { configurable: true, value: height });
+}
+
+function mockProductRowMeasurements(rowHeight) {
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function () {
+    return this.classList.contains("product-grid__row") ? rowHeight : 0;
   });
 }
 
@@ -145,6 +169,47 @@ describe("product list page", () => {
     expect(await screen.findByText("Liquid Jade 2")).toBeInTheDocument();
     expect(screen.queryByText("Iconia Talk S")).not.toBeInTheDocument();
     expectProductRequests(1);
+  });
+
+  it("paginates the product catalog in groups of twelve", async () => {
+    const user = userEvent.setup();
+    const products = createProductCatalog(25);
+    setViewportSize(1440, 1300);
+    server.use(http.get(PRODUCTS_URL, () => HttpResponse.json(products)));
+
+    render(<App />);
+
+    expect(await screen.findByText("Product 1")).toBeInTheDocument();
+    expect(screen.getByText("Page 1 of 3")).toBeInTheDocument();
+    expect(screen.getByText("Product 12")).toBeInTheDocument();
+    expect(screen.queryByText("Product 13")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("list", { name: /Product row/ })).toHaveLength(3);
+
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+
+    expect(await screen.findByText("Product 13")).toBeInTheDocument();
+    expect(screen.queryByText("Product 1")).not.toBeInTheDocument();
+    expect(screen.getByText("Page 2 of 3")).toBeInTheDocument();
+    expectProductRequests(1);
+  });
+
+  it("virtualizes offscreen product rows within each page", async () => {
+    const products = createProductCatalog(100);
+    setViewportSize(390, 768);
+    mockProductRowMeasurements(420);
+    server.use(http.get(PRODUCTS_URL, () => HttpResponse.json(products)));
+
+    render(<App />);
+
+    expect(await screen.findByText("Product 1")).toBeInTheDocument();
+    expect(screen.getByText("Page 1 of 9")).toBeInTheDocument();
+    expect(screen.getAllByRole("list", { name: /Product row/ }).length).toBeLessThan(12);
+    const visibleProductLinks =
+      screen
+        .getAllByRole("link")
+        .filter((link) => link.getAttribute("href")?.startsWith("/products/"));
+    expect(visibleProductLinks.length).toBeGreaterThan(0);
+    expect(visibleProductLinks.length).toBeLessThan(12);
   });
 
   it("does not duplicate the list request when React Strict Mode replays effects", async () => {
