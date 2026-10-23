@@ -16,18 +16,14 @@ export default function ProductListPage() {
 
   return (
     <div className="storefront">
-      <AppHeader breadcrumbs={[{ label: "Products" }]} />
+      <AppHeader />
 
       <main className="product-page">
         <section className="product-page__intro" aria-labelledby="product-page-title">
           <div className="product-page__heading">
-            <p className="eyebrow">Mobile collection</p>
             <h1 className="product-page__title" id="product-page-title">
               Products
             </h1>
-            <p className="product-page__description">
-              Find the right device for your everyday life.
-            </p>
           </div>
           <ProductSearch value={searchTerm} onChange={productListStore.setSearchTerm} />
         </section>

@@ -1,8 +1,9 @@
 import { useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Smartphone } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import AppHeader from "@/components/layout/AppHeader.jsx";
 import ProductActions from "@/components/products/ProductActions.jsx";
+import ProductDetailImage from "@/components/products/ProductDetailImage.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { useCurrentProductStore } from "@/hooks/useCurrentProductStore.js";
 import { currentProductStore } from "@/store/currentProductStore.js";
@@ -100,6 +101,7 @@ export default function ProductDetailsPage() {
   const product = currentResource.product;
   const specifications = product ? getSpecifications(product) : [];
   const breadcrumbItems = [
+    { label: "Home", to: "/" },
     { label: "Products", to: "/" },
     {
       label:
@@ -127,11 +129,6 @@ export default function ProductDetailsPage() {
 
         {currentResource.status === "ready" && product && (
           <>
-            <Link className="detail-back-link product-detail-page__back" to="/">
-              <ArrowLeft size={17} aria-hidden="true" />
-              Back to products
-            </Link>
-
             {currentResource.isStale && (
               <p className="stale-notice" role="status">
                 Showing saved product details. The latest update is unavailable.
@@ -143,20 +140,7 @@ export default function ProductDetailsPage() {
               aria-labelledby="product-detail-title"
             >
               <div className="product-detail-media">
-                {product.imgUrl ? (
-                  <img
-                    className="product-detail-media__image"
-                    src={product.imgUrl}
-                    alt={`${product.brand} ${product.model}`}
-                  />
-                ) : (
-                  <div
-                    className="product-detail-media__placeholder"
-                    aria-hidden="true"
-                  >
-                    <Smartphone size={72} strokeWidth={1.1} />
-                  </div>
-                )}
+                <ProductDetailImage key={product.id} product={product} />
               </div>
 
               <div className="product-detail-info">

@@ -9,8 +9,9 @@ Mobile Storefront is a responsive React single-page application for browsing mob
 ## Features
 
 - Browse a responsive product catalog with up to four columns on wide screens.
+- Navigate the catalog with numbered pages and previous/next controls.
 - Search products by brand or model using local IndexedDB data.
-- View product specifications and choose color and storage options.
+- View product specifications and choose color swatches and storage options.
 - Add a selected variant to the cart and share the updated count across routes.
 - Show loading, error, empty, no-results, and stale-cache states.
 
@@ -90,6 +91,8 @@ The cart API receives `{ id, colorCode, storageCode }`. Its returned `count` upd
 ### UI and styling
 
 The application uses editable shadcn/ui components with CSS for its own layout, responsive breakpoints, and visual tokens. Pages compose the UI, API, storage, and store modules; they do not access `fetch` or Dexie directly.
+
+The storefront's visual refinement follows the supplied product design while preserving the assessment's SPA behavior. The Impeccable design workflow guided a focused review of hierarchy, spacing, product imagery, responsive catalog cards, and product variant controls. Impeccable is a design aid and is not a runtime dependency.
 
 ## API and fixtures
 

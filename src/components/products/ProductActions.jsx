@@ -1,14 +1,23 @@
 import { useState } from "react";
+import { ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button.jsx";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select.jsx";
 import { addProductToCart } from "@/services/api/productsApi.js";
 import { cartStore } from "@/store/cartStore.js";
+
+const COLOR_SWATCHES = {
+  black: "#17191d",
+  blue: "#6e9bc9",
+  gold: "#d9bc70",
+  gray: "#9399a1",
+  green: "#9caf9a",
+  grey: "#9399a1",
+  orange: "#dc9664",
+  pink: "#e7b7bf",
+  red: "#c96e6e",
+  silver: "#d2d5d9",
+  white: "#ffffff",
+  yellow: "#eee39b",
+};
 
 function getOptions(options) {
   return Array.isArray(options) ? options : [];
@@ -18,6 +27,88 @@ function getOptionValue(option) {
   return option?.code === undefined || option?.code === null
     ? ""
     : String(option.code);
+}
+
+function getColorSwatch(name) {
+  const normalizedName = String(name ?? "").trim().toLowerCase();
+  return COLOR_SWATCHES[normalizedName] ?? "#d8dde4";
+}
+
+function ColorOptions({ colors, selectedCode, productId, disabled, onChange }) {
+  return (
+    <fieldset className="product-actions__field" disabled={disabled}>
+      <legend className="product-actions__label">Color</legend>
+      {colors.length > 0 ? (
+        <div className="product-actions__color-options">
+          {colors.map((color) => {
+            const value = getOptionValue(color);
+
+            return (
+              <label
+                className={`product-actions__color-option${selectedCode === value ? " is-selected" : ""}`}
+                key={value || color.name}
+                title={color.name}
+              >
+                <input
+                  aria-label={color.name}
+                  checked={selectedCode === value}
+                  className="product-actions__visually-hidden"
+                  disabled={!value}
+                  name={`product-color-${productId}`}
+                  onChange={() => onChange(value)}
+                  type="radio"
+                  value={value}
+                />
+                <span
+                  aria-hidden="true"
+                  className="product-actions__color-swatch"
+                  style={{ "--product-swatch-color": getColorSwatch(color.name) }}
+                />
+              </label>
+            );
+          })}
+        </div>
+      ) : (
+        <span className="product-actions__hint">No colors available</span>
+      )}
+    </fieldset>
+  );
+}
+
+function StorageOptions({ storages, selectedCode, productId, disabled, onChange }) {
+  return (
+    <fieldset className="product-actions__field" disabled={disabled}>
+      <legend className="product-actions__label">Storage</legend>
+      {storages.length > 0 ? (
+        <div className="product-actions__storage-options">
+          {storages.map((storage) => {
+            const value = getOptionValue(storage);
+
+            return (
+              <label
+                className={`product-actions__storage-option${selectedCode === value ? " is-selected" : ""}`}
+                key={value || storage.name}
+              >
+                <input
+                  aria-label={storage.name}
+                  checked={selectedCode === value}
+                  className="product-actions__visually-hidden"
+                  disabled={!value}
+                  name={`product-storage-${productId}`}
+                  onChange={() => onChange(value)}
+                  type="radio"
+                  value={value}
+                />
+                <span>{storage.name}</span>
+              </label>
+            );
+          })}
+        </div>
+      ) : (
+        <span className="product-actions__hint">No storage options available</span>
+      )}
+    </fieldset>
+  );
 }
 
 export default function ProductActions({ product }) {
@@ -66,69 +157,20 @@ export default function ProductActions({ product }) {
   return (
     <form className="product-actions" onSubmit={handleSubmit}>
       <div className="product-actions__selectors">
-        <div className="product-actions__field">
-          <span className="product-actions__label" id="product-color-label">
-            Color
-          </span>
-          <Select
-            value={colorCode}
-            onValueChange={setColorCode}
-            disabled={colors.length === 0 || isPending}
-          >
-            <SelectTrigger
-              className="product-actions__select"
-              aria-label="Color"
-              aria-labelledby="product-color-label"
-            >
-              <SelectValue placeholder="Select a color" />
-            </SelectTrigger>
-            <SelectContent>
-              {colors.map((color) => (
-                <SelectItem
-                  key={getOptionValue(color)}
-                  value={getOptionValue(color)}
-                >
-                  {color.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {colors.length === 0 && (
-            <span className="product-actions__hint">No colors available</span>
-          )}
-        </div>
-
-        <div className="product-actions__field">
-          <span className="product-actions__label" id="product-storage-label">
-            Storage
-          </span>
-          <Select
-            value={storageCode}
-            onValueChange={setStorageCode}
-            disabled={storages.length === 0 || isPending}
-          >
-            <SelectTrigger
-              className="product-actions__select"
-              aria-label="Storage"
-              aria-labelledby="product-storage-label"
-            >
-              <SelectValue placeholder="Select storage" />
-            </SelectTrigger>
-            <SelectContent>
-              {storages.map((storage) => (
-                <SelectItem
-                  key={getOptionValue(storage)}
-                  value={getOptionValue(storage)}
-                >
-                  {storage.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {storages.length === 0 && (
-            <span className="product-actions__hint">No storage options available</span>
-          )}
-        </div>
+        <ColorOptions
+          colors={colors}
+          disabled={isPending}
+          onChange={setColorCode}
+          productId={product.id}
+          selectedCode={colorCode}
+        />
+        <StorageOptions
+          disabled={isPending}
+          onChange={setStorageCode}
+          productId={product.id}
+          selectedCode={storageCode}
+          storages={storages}
+        />
       </div>
 
       <Button
@@ -136,6 +178,7 @@ export default function ProductActions({ product }) {
         type="submit"
         disabled={!canAddToCart || isPending}
       >
+        <ShoppingCart size={18} aria-hidden="true" />
         {isPending ? "Adding..." : "Add to cart"}
       </Button>
 

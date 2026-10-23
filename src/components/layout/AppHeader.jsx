@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight, ShoppingBag, Smartphone } from "lucide-react";
+import { ChevronRight, ShoppingCart } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -18,11 +18,11 @@ export default function AppHeader({ breadcrumbs = [] }) {
     <header className="site-header">
       <div className="site-header__main">
         <div className="site-header__inner">
-          <Link className="store-brand" to="/" aria-label="Mobile Storefront home">
-            <span className="store-brand__icon" aria-hidden="true">
-              <Smartphone size={21} strokeWidth={1.8} />
+          <Link className="store-brand" to="/" aria-label="ITX Store home">
+            <span className="store-brand__name">
+              <span className="store-brand__name-main">ITX</span>
+              <span className="store-brand__name-accent">Store</span>
             </span>
-            <span>Mobile Storefront</span>
           </Link>
 
           <div
@@ -30,8 +30,7 @@ export default function AppHeader({ breadcrumbs = [] }) {
             role="group"
             aria-label={`Cart items: ${cartCount}`}
           >
-            <ShoppingBag size={19} strokeWidth={1.8} aria-hidden="true" />
-            <span className="cart-summary__label">Cart</span>
+            <ShoppingCart size={23} strokeWidth={1.8} aria-hidden="true" />
             <span className="cart-summary__count" aria-live="polite">
               {cartCount}
             </span>
@@ -39,34 +38,36 @@ export default function AppHeader({ breadcrumbs = [] }) {
         </div>
       </div>
 
-      <div className="site-header__breadcrumb-row">
-        <Breadcrumb>
-          <BreadcrumbList>
-            {breadcrumbs.map((breadcrumb, index) => {
-              const isCurrentPage = index === breadcrumbs.length - 1;
+      {breadcrumbs.length > 0 && (
+        <div className="site-header__breadcrumb-row">
+          <Breadcrumb>
+            <BreadcrumbList>
+              {breadcrumbs.map((breadcrumb, index) => {
+                const isCurrentPage = index === breadcrumbs.length - 1;
 
-              return (
-                <Fragment key={breadcrumb.to ?? breadcrumb.label}>
-                  {index > 0 && (
-                    <BreadcrumbSeparator>
-                      <ChevronRight aria-hidden="true" />
-                    </BreadcrumbSeparator>
-                  )}
-                  <BreadcrumbItem>
-                    {isCurrentPage ? (
-                      <BreadcrumbPage>{breadcrumb.label}</BreadcrumbPage>
-                    ) : (
-                      <BreadcrumbLink asChild>
-                        <Link to={breadcrumb.to}>{breadcrumb.label}</Link>
-                      </BreadcrumbLink>
+                return (
+                  <Fragment key={breadcrumb.label}>
+                    {index > 0 && (
+                      <BreadcrumbSeparator>
+                        <ChevronRight aria-hidden="true" />
+                      </BreadcrumbSeparator>
                     )}
-                  </BreadcrumbItem>
-                </Fragment>
-              );
-            })}
-          </BreadcrumbList>
-        </Breadcrumb>
-      </div>
+                    <BreadcrumbItem>
+                      {isCurrentPage ? (
+                        <BreadcrumbPage>{breadcrumb.label}</BreadcrumbPage>
+                      ) : (
+                        <BreadcrumbLink asChild>
+                          <Link to={breadcrumb.to}>{breadcrumb.label}</Link>
+                        </BreadcrumbLink>
+                      )}
+                    </BreadcrumbItem>
+                  </Fragment>
+                );
+              })}
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+      )}
     </header>
   );
 }

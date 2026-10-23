@@ -111,16 +111,16 @@ describe("product list page", () => {
     expect(screen.getByText("170 \u20ac")).toBeInTheDocument();
   });
 
-  it("renders catalog navigation", async () => {
+  it("renders the store header without a breadcrumb on the listing page", async () => {
     render(<App />);
 
     await screen.findByText("Iconia Talk S");
     expect(
-      screen.getByRole("link", { name: "Mobile Storefront home" }),
+      screen.getByRole("link", { name: "ITX Store home" }),
     ).toHaveAttribute("href", "/");
     expect(
-      screen.getByRole("navigation", { name: "breadcrumb" }),
-    ).toBeInTheDocument();
+      screen.queryByRole("navigation", { name: "breadcrumb" }),
+    ).not.toBeInTheDocument();
   });
 
   it("filters by model in Dexie without another API request", async () => {
@@ -181,6 +181,10 @@ describe("product list page", () => {
 
     expect(await screen.findByText("Product 1")).toBeInTheDocument();
     expect(screen.getByText("Page 1 of 3")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Page 1" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
     expect(screen.getByText("Product 12")).toBeInTheDocument();
     expect(screen.queryByText("Product 13")).not.toBeInTheDocument();
     expect(screen.getAllByRole("list", { name: /Product row/ })).toHaveLength(3);
@@ -190,7 +194,23 @@ describe("product list page", () => {
     expect(await screen.findByText("Product 13")).toBeInTheDocument();
     expect(screen.queryByText("Product 1")).not.toBeInTheDocument();
     expect(screen.getByText("Page 2 of 3")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Page 2" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
     expectProductRequests(1);
+  });
+
+  it("keeps four product columns at the reference desktop width", async () => {
+    const products = createProductCatalog(12);
+    setViewportSize(1000, 1300);
+    mockProductRowMeasurements(280);
+    server.use(http.get(PRODUCTS_URL, () => HttpResponse.json(products)));
+
+    render(<App />);
+
+    expect(await screen.findByText("Product 12")).toBeInTheDocument();
+    expect(screen.getAllByRole("list", { name: /Product row/ })).toHaveLength(3);
   });
 
   it("virtualizes offscreen product rows within each page", async () => {
