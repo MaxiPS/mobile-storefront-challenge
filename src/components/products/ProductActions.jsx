@@ -8,7 +8,7 @@ import {
   SelectValue,
 } from "@/components/ui/select.jsx";
 import { addProductToCart } from "@/services/api/productsApi.js";
-import { appStore } from "@/store/appStore.js";
+import { cartStore } from "@/store/cartStore.js";
 
 function getOptions(options) {
   return Array.isArray(options) ? options : [];
@@ -56,7 +56,7 @@ export default function ProductActions({ product }) {
         throw new TypeError("Cart API response must include a valid count");
       }
 
-      await appStore.setCartCount(result.count);
+      cartStore.setCartCount(result.count);
       setRequestStatus("success");
     } catch {
       setRequestStatus("error");

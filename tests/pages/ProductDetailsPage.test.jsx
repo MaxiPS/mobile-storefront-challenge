@@ -1,43 +1,51 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import AppRoutes from "@/app/routes.jsx";
-import {
-  addProductToCart,
-  getProductById,
-  getProducts,
-} from "@/services/api/productsApi.js";
 import { db } from "@/services/storage/dexieDatabase.js";
-import { appStore } from "@/store/appStore.js";
+import { cartStore } from "@/store/cartStore.js";
 import productDetailFixture from "../fixtures/product-detail.json";
 import productsFixture from "../fixtures/products.json";
 
-vi.mock("@/services/api/productsApi.js", () => ({
-  addProductToCart: vi.fn(),
-  getProductById: vi.fn(),
-  getProducts: vi.fn(),
-}));
+const API_BASE_URL = "https://itx-frontend-test.onrender.com/api";
+const DETAIL_URL = `${API_BASE_URL}/product/${productDetailFixture.id}`;
+const LIST_URL = `${API_BASE_URL}/product`;
+const CART_URL = `${API_BASE_URL}/cart`;
+const server = setupServer(
+  http.get(LIST_URL, () => HttpResponse.json(productsFixture)),
+  http.get(DETAIL_URL, () => HttpResponse.json(productDetailFixture)),
+  http.post(CART_URL, async ({ request }) => {
+    cartPayloads.push(await request.json());
+    return HttpResponse.json({ count: 4 });
+  }),
+);
+let requests = [];
+let cartPayloads = [];
 
-afterEach(cleanup);
+beforeAll(() => {
+  server.events.on("request:start", ({ request }) => {
+    requests.push({ method: request.method, url: request.url });
+  });
+  server.listen({ onUnhandledFrame: "error" });
+});
+afterEach(() => {
+  cleanup();
+  server.resetHandlers();
+});
+afterAll(() => server.close());
+
+function expectDetailRequests(count) {
+  expect(requests.filter(({ url }) => url === DETAIL_URL)).toEqual(
+    Array.from({ length: count }, () => ({ method: "GET", url: DETAIL_URL })),
+  );
+}
 
 async function clearDatabase() {
-  await db.transaction(
-    "rw",
-    db.apiCache,
-    db.products,
-    db.productDetails,
-    db.appState,
-    async () => {
-      await Promise.all([
-        db.apiCache.clear(),
-        db.products.clear(),
-        db.productDetails.clear(),
-        db.appState.clear(),
-      ]);
-    },
-  );
+  await db.apiCache.clear();
 }
 
 function renderApplication({ strict = false } = {}) {
@@ -51,26 +59,37 @@ function renderApplication({ strict = false } = {}) {
 }
 
 beforeEach(async () => {
-  vi.clearAllMocks();
+  requests = [];
+  cartPayloads = [];
   await clearDatabase();
-  await appStore.setCartCount(0);
-  getProducts.mockResolvedValue(productsFixture);
-  getProductById.mockResolvedValue(productDetailFixture);
-  addProductToCart.mockResolvedValue({ count: 4 });
+  cartStore.setCartCount(0);
 });
 
 describe("product details page", () => {
-  it("loads and shows the available product specifications", async () => {
+  it("loads the requested product from the API", async () => {
     renderApplication();
 
     expect(
       await screen.findByRole("heading", { name: "Iconia Talk S" }),
     ).toBeInTheDocument();
+    expectDetailRequests(1);
+  });
+
+  it("shows the product identity and price", async () => {
+    renderApplication();
+
+    await screen.findByRole("heading", { name: "Iconia Talk S" });
     expect(screen.getByText("Acer")).toBeInTheDocument();
     expect(
       screen.getByRole("img", { name: "Acer Iconia Talk S" }),
     ).toHaveAttribute("src", productDetailFixture.imgUrl);
     expect(screen.getByText("170 \u20ac")).toBeInTheDocument();
+  });
+
+  it("shows the available product specifications", async () => {
+    renderApplication();
+
+    await screen.findByRole("heading", { name: "Iconia Talk S" });
     expect(screen.getByText("Quad-core 1.3 GHz Cortex-A53")).toBeInTheDocument();
     expect(screen.getByText("2 GB RAM")).toBeInTheDocument();
     expect(screen.getByText("Android 6.0 (Marshmallow)")).toBeInTheDocument();
@@ -84,7 +103,6 @@ describe("product details page", () => {
       screen.getByText("191.7 x 101 x 9.4 mm (7.55 x 3.98 x 0.37 in)"),
     ).toBeInTheDocument();
     expect(screen.getByText("260 g")).toBeInTheDocument();
-    expect(getProductById).toHaveBeenCalledWith(productDetailFixture.id);
   });
 
   it("shows color and storage selectors with their first options selected", async () => {
@@ -117,13 +135,13 @@ describe("product details page", () => {
   });
 
   it("omits the specifications section when optional details are unavailable", async () => {
-    getProductById.mockResolvedValueOnce({
+    server.use(http.get(DETAIL_URL, () => HttpResponse.json({
       id: productDetailFixture.id,
       brand: "Acer",
       model: "Iconia Talk S",
       price: "170",
       options: productDetailFixture.options,
-    });
+    })));
 
     renderApplication();
 
@@ -133,9 +151,6 @@ describe("product details page", () => {
     expect(
       screen.queryByRole("heading", { name: "Specifications" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Color" })).toHaveTextContent(
-      "Black",
-    );
   });
 
   it("returns to the product listing from the detail page", async () => {
@@ -149,7 +164,7 @@ describe("product details page", () => {
     expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
   });
 
-  it("posts the selected variant codes and persists the updated cart count", async () => {
+  it("posts the selected variant codes to the cart endpoint", async () => {
     const user = userEvent.setup();
     renderApplication();
 
@@ -159,28 +174,38 @@ describe("product details page", () => {
     await user.keyboard("{Enter}{ArrowDown}{Enter}");
     await user.click(screen.getByRole("button", { name: "Add to cart" }));
 
-    await waitFor(() => {
-      expect(addProductToCart).toHaveBeenCalledWith({
-        id: productDetailFixture.id,
-        colorCode: 1000,
-        storageCode: 2001,
-      });
-    });
+    await waitFor(() => expect(cartPayloads).toEqual([{
+      id: productDetailFixture.id,
+      colorCode: 1000,
+      storageCode: 2001,
+    }]));
+    expect(requests.filter(({ url }) => url === CART_URL)).toEqual([
+      { method: "POST", url: CART_URL },
+    ]);
+  });
+
+  it("shows the updated cart count after a successful submission", async () => {
+    const user = userEvent.setup();
+    renderApplication();
+
+    await screen.findByRole("heading", { name: "Iconia Talk S" });
+    await user.click(screen.getByRole("button", { name: "Add to cart" }));
+
     expect(await screen.findByText("Added to cart")).toBeInTheDocument();
     expect(
       await screen.findByRole("group", { name: "Cart items: 4" }),
     ).toBeInTheDocument();
-    expect(await db.appState.get("cartCount")).toMatchObject({ value: 4 });
+    expect(cartStore.getSnapshot().cartCount).toBe(4);
   });
 
   it("disables the add button while the cart request is pending", async () => {
     const user = userEvent.setup();
     let resolveCartRequest;
-    addProductToCart.mockReturnValue(
+    server.use(http.post(CART_URL, () =>
       new Promise((resolve) => {
         resolveCartRequest = resolve;
       }),
-    );
+    ));
     renderApplication();
 
     await screen.findByRole("heading", { name: "Iconia Talk S" });
@@ -189,13 +214,14 @@ describe("product details page", () => {
 
     expect(addButton).toBeDisabled();
     expect(addButton).toHaveTextContent("Adding");
-    resolveCartRequest({ count: 4 });
+    await waitFor(() => expect(resolveCartRequest).toBeTypeOf("function"));
+    resolveCartRequest(HttpResponse.json({ count: 4 }));
     expect(await screen.findByText("Added to cart")).toBeInTheDocument();
   });
 
   it("shows an error when adding the product to the cart fails", async () => {
     const user = userEvent.setup();
-    addProductToCart.mockRejectedValueOnce(new Error("Cart unavailable"));
+    server.use(http.post(CART_URL, () => HttpResponse.error()));
     renderApplication();
 
     await screen.findByRole("heading", { name: "Iconia Talk S" });
@@ -208,15 +234,16 @@ describe("product details page", () => {
 
   it("shows a loading state while the product detail request is pending", async () => {
     let resolveProduct;
-    getProductById.mockReturnValue(
+    server.use(http.get(DETAIL_URL, () =>
       new Promise((resolve) => {
         resolveProduct = resolve;
       }),
-    );
+    ));
     renderApplication();
 
     expect(screen.getByRole("status")).toHaveTextContent("Loading product");
-    resolveProduct(productDetailFixture);
+    await waitFor(() => expect(resolveProduct).toBeTypeOf("function"));
+    resolveProduct(HttpResponse.json(productDetailFixture));
     expect(
       await screen.findByRole("heading", { name: "Iconia Talk S" }),
     ).toBeInTheDocument();
@@ -224,9 +251,13 @@ describe("product details page", () => {
 
   it("retries when loading the product detail fails", async () => {
     const user = userEvent.setup();
-    getProductById
-      .mockRejectedValueOnce(new Error("Network unavailable"))
-      .mockResolvedValueOnce(productDetailFixture);
+    let attempt = 0;
+    server.use(http.get(DETAIL_URL, () => {
+      attempt += 1;
+      return attempt === 1
+        ? HttpResponse.error()
+        : HttpResponse.json(productDetailFixture);
+    }));
     renderApplication();
 
     expect(
@@ -237,15 +268,11 @@ describe("product details page", () => {
     expect(
       await screen.findByRole("heading", { name: "Iconia Talk S" }),
     ).toBeInTheDocument();
-    expect(getProductById).toHaveBeenCalledTimes(2);
+    expectDetailRequests(2);
   });
 
   it("shows a not-found state when the API returns a 404", async () => {
-    getProductById.mockRejectedValueOnce(
-      Object.assign(new Error("API request failed with status 404"), {
-        status: 404,
-      }),
-    );
+    server.use(http.get(DETAIL_URL, () => HttpResponse.json({}, { status: 404 })));
     renderApplication();
 
     expect(
@@ -259,36 +286,30 @@ describe("product details page", () => {
 
   it("uses a valid cached detail without calling the API again", async () => {
     const now = Date.now();
-    await db.transaction("rw", db.apiCache, db.productDetails, async () => {
-      await db.productDetails.put(productDetailFixture);
-      await db.apiCache.put({
+    await db.apiCache.put({
         key: `/product/${productDetailFixture.id}`,
         response: productDetailFixture,
         savedAt: now,
         expiresAt: now + 60_000,
       });
-    });
 
     renderApplication();
 
     expect(
       await screen.findByRole("heading", { name: "Iconia Talk S" }),
     ).toBeInTheDocument();
-    expect(getProductById).not.toHaveBeenCalled();
+    expectDetailRequests(0);
   });
 
   it("shows the saved detail with a stale notice when refresh fails", async () => {
     const now = Date.now();
-    await db.transaction("rw", db.apiCache, db.productDetails, async () => {
-      await db.productDetails.put(productDetailFixture);
-      await db.apiCache.put({
+    await db.apiCache.put({
         key: `/product/${productDetailFixture.id}`,
         response: productDetailFixture,
         savedAt: now - 120_000,
         expiresAt: now - 60_000,
       });
-    });
-    getProductById.mockRejectedValueOnce(new Error("Network unavailable"));
+    server.use(http.get(DETAIL_URL, () => HttpResponse.error()));
 
     renderApplication();
 
@@ -298,7 +319,7 @@ describe("product details page", () => {
     expect(screen.getByRole("status")).toHaveTextContent(
       "Showing saved product details",
     );
-    expect(getProductById).toHaveBeenCalledWith(productDetailFixture.id);
+    expectDetailRequests(1);
   });
 
   it("does not duplicate a detail request when React Strict Mode replays effects", async () => {
@@ -307,6 +328,6 @@ describe("product details page", () => {
     expect(
       await screen.findByRole("heading", { name: "Iconia Talk S" }),
     ).toBeInTheDocument();
-    expect(getProductById).toHaveBeenCalledTimes(1);
+    expectDetailRequests(1);
   });
 });

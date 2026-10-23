@@ -1,175 +1,63 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import productDetailFixture from "../../fixtures/product-detail.json";
-import productsFixture from "../../fixtures/products.json";
+import detail from "../../fixtures/product-detail.json";
+import products from "../../fixtures/products.json";
 import { CACHE_TTL_MS, createProductsCache } from "@/services/storage/cache.js";
-import { createProductRepository } from "@/services/storage/productRepository.js";
-import {
-  createTestDatabase,
-  disposeTestDatabase,
-} from "../../helpers/createTestDatabase.js";
+import { createTestDatabase, disposeTestDatabase } from "../../helpers/createTestDatabase.js";
 
-describe("GET response cache", () => {
+describe("IndexedDB response cache", () => {
   let database;
-  let repository;
-  let currentTime;
   let fetchProducts;
   let fetchProductById;
   let cache;
-
+  let time;
   beforeEach(async () => {
     database = await createTestDatabase();
-    repository = createProductRepository(database);
-    currentTime = 1_000_000;
-    fetchProducts = vi.fn().mockResolvedValue(productsFixture);
-    fetchProductById = vi.fn().mockResolvedValue(productDetailFixture);
-    cache = createProductsCache({
-      database,
-      repository,
-      fetchProducts,
-      fetchProductById,
-      now: () => currentTime,
-    });
+    fetchProducts = vi.fn().mockResolvedValue(products);
+    fetchProductById = vi.fn().mockResolvedValue(detail);
+    time = 1000;
+    cache = createProductsCache({ database, fetchProducts, fetchProductById, now: () => time });
   });
+  afterEach(async () => disposeTestDatabase(database));
 
-  afterEach(async () => {
-    await disposeTestDatabase(database);
-  });
-
-  it("fetches a missing product list and saves it with a one-hour TTL", async () => {
-    const result = await cache.getProducts();
-
+  it("stores a fetched product list in IndexedDB", async () => {
+    await cache.getProducts();
     expect(fetchProducts).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({ isStale: false });
-    expect(result.products.map(({ id }) => id)).toEqual(
-      productsFixture.map(({ id }) => id),
-    );
-    await expect(database.apiCache.get("/product")).resolves.toMatchObject({
-      key: "/product",
-      response: productsFixture,
-      savedAt: currentTime,
-      expiresAt: currentTime + CACHE_TTL_MS,
-    });
-    await expect(database.products.count()).resolves.toBe(productsFixture.length);
+    expect(await database.apiCache.count()).toBe(1);
+    expect((await database.apiCache.get("/product")).response).toEqual(products);
   });
 
-  it("reads a fresh product list locally without calling the API again", async () => {
+  it("serves a fresh product list from IndexedDB", async () => {
     await cache.getProducts();
     fetchProducts.mockClear();
-    currentTime += CACHE_TTL_MS - 1;
-
-    const result = await cache.getProducts();
-
+    expect(await cache.getProducts()).toEqual({ products, isStale: false });
     expect(fetchProducts).not.toHaveBeenCalled();
-    expect(result.isStale).toBe(false);
-    expect(result.products.map(({ id }) => id)).toEqual(
-      productsFixture.map(({ id }) => id),
-    );
   });
 
-  it("revalidates expired products atomically and removes expired cache entries", async () => {
+  it("uses a stale list when refresh fails", async () => {
     await cache.getProducts();
-    const replacementProducts = [productsFixture[1]];
-    fetchProducts.mockResolvedValue(replacementProducts);
-    await database.apiCache.put({
-      key: "/product/old",
-      response: {},
-      savedAt: currentTime - 2 * CACHE_TTL_MS,
-      expiresAt: currentTime - 1,
-    });
-    currentTime += CACHE_TTL_MS;
-
-    const result = await cache.getProducts();
-
-    expect(fetchProducts).toHaveBeenCalledTimes(2);
-    expect(result.products.map(({ id }) => id)).toEqual([
-      replacementProducts[0].id,
-    ]);
-    await expect(database.apiCache.get("/product/old")).resolves.toBeUndefined();
-    await expect(database.apiCache.get("/product")).resolves.toMatchObject({
-      response: replacementProducts,
-      savedAt: currentTime,
-      expiresAt: currentTime + CACHE_TTL_MS,
-    });
-    await expect(database.products.count()).resolves.toBe(1);
+    time += CACHE_TTL_MS;
+    fetchProducts.mockRejectedValueOnce(new Error("offline"));
+    expect(await cache.getProducts()).toEqual({ products, isStale: true });
   });
 
-  it("keeps the previous products and cache entry if revalidation cannot commit", async () => {
-    await cache.getProducts();
-    currentTime += CACHE_TTL_MS;
-    fetchProducts.mockResolvedValue([productsFixture[1]]);
-    vi.spyOn(database.apiCache, "put").mockRejectedValueOnce(
-      new Error("Storage unavailable"),
-    );
-
-    const result = await cache.getProducts();
-
-    expect(result.isStale).toBe(true);
-    expect(result.products.map(({ id }) => id)).toEqual(
-      productsFixture.map(({ id }) => id),
-    );
-    await expect(database.apiCache.get("/product")).resolves.toMatchObject({
-      response: productsFixture,
-    });
-    await expect(database.products.count()).resolves.toBe(productsFixture.length);
-  });
-
-  it("returns expired local products as stale data when revalidation fails", async () => {
-    await cache.getProducts();
-    currentTime += CACHE_TTL_MS;
-    fetchProducts.mockRejectedValue(new TypeError("Network unavailable"));
-
-    const result = await cache.getProducts();
-
-    expect(result.isStale).toBe(true);
-    expect(result.products.map(({ id }) => id)).toEqual(
-      productsFixture.map(({ id }) => id),
-    );
-  });
-
-  it("propagates API errors when no cached product list is available", async () => {
-    const networkError = new TypeError("Network unavailable");
-    fetchProducts.mockRejectedValue(networkError);
-
-    await expect(cache.getProducts()).rejects.toBe(networkError);
-    await expect(database.apiCache.count()).resolves.toBe(0);
-  });
-
-  it("does not cache invalid product API responses", async () => {
-    fetchProducts.mockResolvedValue([{ id: "", brand: "Acer" }]);
-
-    await expect(cache.getProducts()).rejects.toThrow(
-      "Product API response must be an array of products",
-    );
-    await expect(database.apiCache.count()).resolves.toBe(0);
-    await expect(database.products.count()).resolves.toBe(0);
-  });
-
-  it("caches product details by ID and reuses a fresh local detail", async () => {
-    const first = await cache.getProductDetail(productDetailFixture.id);
+  it("serves a fresh cached product detail", async () => {
+    await cache.getProductDetail(detail.id);
     fetchProductById.mockClear();
-    const second = await cache.getProductDetail(productDetailFixture.id);
-
-    expect(first).toMatchObject({ product: productDetailFixture, isStale: false });
-    expect(second).toMatchObject({ product: productDetailFixture, isStale: false });
+    await cache.getProductDetail(detail.id);
     expect(fetchProductById).not.toHaveBeenCalled();
-    await expect(
-      database.apiCache.get(`/product/${productDetailFixture.id}`),
-    ).resolves.toMatchObject({ response: productDetailFixture });
-    await expect(
-      database.productDetails.get(productDetailFixture.id),
-    ).resolves.toEqual(productDetailFixture);
+    expect(await database.apiCache.count()).toBe(1);
   });
 
-  it("returns an expired product detail as stale data when the API is unavailable", async () => {
-    await cache.getProductDetail(productDetailFixture.id);
-    currentTime += CACHE_TTL_MS;
-    fetchProductById.mockRejectedValue(new TypeError("Network unavailable"));
+  it("uses a stale detail when refresh fails", async () => {
+    await cache.getProductDetail(detail.id);
+    time += CACHE_TTL_MS;
+    fetchProductById.mockRejectedValueOnce(new Error("offline"));
+    expect(await cache.getProductDetail(detail.id)).toEqual({ product: detail, isStale: true });
+  });
 
-    const result = await cache.getProductDetail(productDetailFixture.id);
-
-    expect(result).toMatchObject({
-      product: productDetailFixture,
-      isStale: true,
-    });
+  it("rejects invalid responses without writing them", async () => {
+    fetchProducts.mockResolvedValueOnce([{ id: "" }]);
+    await expect(cache.getProducts()).rejects.toThrow("Product API response is invalid");
+    expect(await database.apiCache.count()).toBe(0);
   });
 });

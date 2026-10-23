@@ -22,9 +22,9 @@ Mobile Storefront is a responsive React single-page application for browsing mob
 | Routing | React Router |
 | UI components | shadcn/ui and Radix UI |
 | Application styling | CSS |
-| Local persistence | Dexie.js over IndexedDB |
-| Shared state | `useSyncExternalStore` |
-| Tests | Vitest and React Testing Library |
+| Product cache | Dexie.js over IndexedDB |
+| Shared state | Three in-memory stores with `useSyncExternalStore` |
+| Tests | Vitest, React Testing Library, and MSW |
 | Code quality | ESLint |
 
 Tailwind CSS is retained for the shadcn/ui setup; the application's own layout and styles are written in CSS.
@@ -67,25 +67,25 @@ Vite prints the local development URL in the terminal.
 
 ```mermaid
 flowchart LR
-  Pages[Product pages] --> Cache[Cache service]
+  Pages[Product pages] --> Stores[Cart, list, and current product stores]
+  Stores --> Cache[Cache service]
   Cache --> API[Assessment API]
   Cache --> DB[(IndexedDB via Dexie)]
-  Search[Catalog search] --> Repository[Product repository]
+  Search[Catalog search] --> Repository[Local cache search]
   Repository --> DB
   Cart[Cart actions] --> API
-  Cart --> Store[External cart store]
-  Store --> DB
+  API --> Stores
 ```
 
 ### Catalog and local search
 
-The API service encapsulates HTTP requests. The storage service caches product list and detail responses in Dexie for one hour and stores normalized search fields in the `products` table. When the list cache is missing or expired, the app requests fresh data and updates IndexedDB. If refresh fails after expiration, the saved response remains available and the page marks it as stale.
+The API service encapsulates HTTP requests. Dexie keeps product list and detail responses in the single `apiCache` table for one hour. When the list cache is missing or expired, the app requests fresh data and updates IndexedDB. If refresh fails after expiration, the saved response remains available and the page marks it as stale.
 
-The search field calls the local product repository, which filters the IndexedDB records by brand and model. Changing the search term does not call the API.
+The list store calls the local product repository, which reads the cached list from IndexedDB and filters it by brand and model. Changing the search term does not call the API.
 
 ### Cart state
 
-The cart API receives `{ id, colorCode, storageCode }`. Its returned `count` updates an external store and is persisted in IndexedDB. React components subscribe to stable store snapshots through `useSyncExternalStore`.
+The cart API receives `{ id, colorCode, storageCode }`. Its returned `count` updates the in-memory cart store. The product list and current product have separate in-memory stores. React components subscribe to each store's stable snapshots through `useSyncExternalStore`. The cart count resets on page reload.
 
 ### UI and styling
 
@@ -101,7 +101,7 @@ The application uses the assessment service at `https://itx-frontend-test.onrend
 | `GET` | `/product/:id` | Load product details and variant options. |
 | `POST` | `/cart` | Add a product variant and receive the cart count. |
 
-Representative GET responses are stored in `tests/fixtures/`. Automated tests mock `fetch` and use fixtures, so the test suite and CI do not depend on the live API. The API's detail response uses the field names `dimentions` and `secondaryCmera`.
+Representative GET responses are stored in `tests/fixtures/`. API contract and page integration tests use MSW to intercept HTTP requests at the expected endpoints. Cache policy tests inject request functions to isolate expiration and fallback behavior. The test suite and CI do not depend on the live API. The API's detail response uses the field names `dimentions` and `secondaryCmera`.
 
 ## Testing and quality
 
@@ -118,7 +118,7 @@ npm run LINT
 ## Known limitations
 
 - Uncached catalog and detail requests, product images, and cart updates depend on the assessment service being available.
-- IndexedDB is local to the browser and site origin. Clearing browser site data removes the local cache and saved cart count.
+- IndexedDB is local to the browser and site origin. Clearing browser site data removes the product cache.
 - If an API refresh fails, the app can show saved catalog or detail data as stale; it cannot refresh while the service is unavailable.
 - Automated tests mock the cart endpoint. The live cart endpoint has not been manually called because it changes remote cart data.
 

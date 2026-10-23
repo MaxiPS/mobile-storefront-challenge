@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
-import { appStore } from "@/store/appStore.js";
+import { cartStore } from "@/store/cartStore.js";
 
-export function useAppStore(store = appStore) {
+export function useCartStore(store = cartStore) {
   return useSyncExternalStore(store.subscribe, store.getSnapshot);
 }

@@ -9,10 +9,10 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb.jsx";
-import { useAppStore } from "@/hooks/useAppStore.js";
+import { useCartStore } from "@/hooks/useCartStore.js";
 
 export default function AppHeader({ breadcrumbs = [] }) {
-  const { cartCount, isHydrated } = useAppStore();
+  const { cartCount } = useCartStore();
 
   return (
     <header className="site-header">
@@ -28,14 +28,12 @@ export default function AppHeader({ breadcrumbs = [] }) {
           <div
             className="cart-summary"
             role="group"
-            aria-label={
-              isHydrated ? `Cart items: ${cartCount}` : "Cart count loading"
-            }
+            aria-label={`Cart items: ${cartCount}`}
           >
             <ShoppingBag size={19} strokeWidth={1.8} aria-hidden="true" />
             <span className="cart-summary__label">Cart</span>
             <span className="cart-summary__count" aria-live="polite">
-              {isHydrated ? cartCount : "—"}
+              {cartCount}
             </span>
           </div>
         </div>
