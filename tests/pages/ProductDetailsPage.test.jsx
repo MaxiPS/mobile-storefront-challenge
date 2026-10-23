@@ -136,20 +136,17 @@ describe("product details page", () => {
     expect(screen.getByRole("radio", { name: "16 GB" })).toBeChecked();
   });
 
-  it("shows the home, products, and current product breadcrumb trail", async () => {
+  it("shows products and the current product in the breadcrumb trail", async () => {
     renderApplication();
 
     await screen.findByRole("heading", { name: "Iconia Talk S" });
 
     const breadcrumb = screen.getByRole("navigation", { name: "breadcrumb" });
-    expect(within(breadcrumb).getByRole("link", { name: "Home" })).toHaveAttribute(
-      "href",
-      "/",
-    );
     expect(within(breadcrumb).getByRole("link", { name: "Products" })).toHaveAttribute(
       "href",
       "/",
     );
+    expect(within(breadcrumb).queryByRole("link", { name: "Home" })).not.toBeInTheDocument();
     expect(within(breadcrumb).getByText("Iconia Talk S")).toHaveAttribute(
       "aria-current",
       "page",
@@ -196,7 +193,7 @@ describe("product details page", () => {
     renderApplication();
 
     await screen.findByRole("heading", { name: "Iconia Talk S" });
-    await user.click(screen.getByRole("link", { name: "Home" }));
+    await user.click(screen.getByRole("link", { name: "Products" }));
 
     expect(await screen.findByRole("heading", { name: "Products" })).toBeInTheDocument();
     expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();

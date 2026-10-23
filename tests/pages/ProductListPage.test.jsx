@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { http, HttpResponse } from "msw";
@@ -14,6 +14,7 @@ import productsFixture from "../fixtures/products.json";
 
 const PRODUCTS_URL = "https://itx-frontend-test.onrender.com/api/product";
 const INITIAL_VIEWPORT = { width: window.innerWidth, height: window.innerHeight };
+const INITIAL_SCROLL_Y = window.scrollY;
 const server = setupServer(
   http.get(PRODUCTS_URL, () => HttpResponse.json(productsFixture)),
 );
@@ -34,6 +35,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   Object.defineProperty(window, "innerWidth", { configurable: true, value: INITIAL_VIEWPORT.width });
   Object.defineProperty(window, "innerHeight", { configurable: true, value: INITIAL_VIEWPORT.height });
+  Object.defineProperty(window, "scrollY", { configurable: true, value: INITIAL_SCROLL_Y });
 });
 
 function expectProductRequests(count) {
@@ -70,6 +72,11 @@ function setViewportSize(width, height) {
   Object.defineProperty(window, "innerHeight", { configurable: true, value: height });
 }
 
+function scrollWindowTo(offset) {
+  Object.defineProperty(window, "scrollY", { configurable: true, value: offset });
+  fireEvent.scroll(window);
+}
+
 function mockProductRowMeasurements(rowHeight) {
   vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function () {
     return this.classList.contains("product-grid__row") ? rowHeight : 0;
@@ -104,6 +111,14 @@ describe("product list page", () => {
     render(<App />);
 
     expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
+    const productCardLink = screen.getByRole("link", {
+      name: "View Acer Iconia Talk S details",
+    });
+    expect(productCardLink).toHaveAttribute("href", `/products/${productsFixture[0].id}`);
+    expect(productCardLink).toContainElement(
+      screen.getByRole("heading", { name: "Iconia Talk S" }),
+    );
+    expect(screen.queryByText("View details", { exact: true })).not.toBeInTheDocument();
     expect(
       screen.getByRole("img", { name: "Acer Iconia Talk S" }),
     ).toBeInTheDocument();
@@ -171,36 +186,6 @@ describe("product list page", () => {
     expectProductRequests(1);
   });
 
-  it("paginates the product catalog in groups of twelve", async () => {
-    const user = userEvent.setup();
-    const products = createProductCatalog(25);
-    setViewportSize(1440, 1300);
-    server.use(http.get(PRODUCTS_URL, () => HttpResponse.json(products)));
-
-    render(<App />);
-
-    expect(await screen.findByText("Product 1")).toBeInTheDocument();
-    expect(screen.getByText("Page 1 of 3")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Page 1" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expect(screen.getByText("Product 12")).toBeInTheDocument();
-    expect(screen.queryByText("Product 13")).not.toBeInTheDocument();
-    expect(screen.getAllByRole("list", { name: /Product row/ })).toHaveLength(3);
-
-    await user.click(screen.getByRole("button", { name: "Next page" }));
-
-    expect(await screen.findByText("Product 13")).toBeInTheDocument();
-    expect(screen.queryByText("Product 1")).not.toBeInTheDocument();
-    expect(screen.getByText("Page 2 of 3")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Page 2" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    expectProductRequests(1);
-  });
-
   it("keeps four product columns at the reference desktop width", async () => {
     const products = createProductCatalog(12);
     setViewportSize(1000, 1300);
@@ -213,7 +198,7 @@ describe("product list page", () => {
     expect(screen.getAllByRole("list", { name: /Product row/ })).toHaveLength(3);
   });
 
-  it("virtualizes offscreen product rows within each page", async () => {
+  it("scrolls through all products while virtualizing offscreen rows", async () => {
     const products = createProductCatalog(100);
     setViewportSize(390, 768);
     mockProductRowMeasurements(420);
@@ -222,14 +207,26 @@ describe("product list page", () => {
     render(<App />);
 
     expect(await screen.findByText("Product 1")).toBeInTheDocument();
-    expect(screen.getByText("Page 1 of 9")).toBeInTheDocument();
-    expect(screen.getAllByRole("list", { name: /Product row/ }).length).toBeLessThan(12);
+    expect(
+      screen.queryByRole("navigation", { name: "Product pagination" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Product 100")).not.toBeInTheDocument();
+
+    scrollWindowTo(420 * 12);
+    expect(await screen.findByText("Product 13")).toBeInTheDocument();
+    expect(screen.queryByText("Product 1")).not.toBeInTheDocument();
+
+    scrollWindowTo(420 * 90);
+    expect(await screen.findByText("Product 91")).toBeInTheDocument();
+
+    expectProductRequests(1);
+    expect(screen.getAllByRole("list", { name: /Product row/ }).length).toBeLessThan(100);
     const visibleProductLinks =
       screen
         .getAllByRole("link")
         .filter((link) => link.getAttribute("href")?.startsWith("/products/"));
     expect(visibleProductLinks.length).toBeGreaterThan(0);
-    expect(visibleProductLinks.length).toBeLessThan(12);
+    expect(visibleProductLinks.length).toBeLessThan(100);
   });
 
   it("does not duplicate the list request when React Strict Mode replays effects", async () => {

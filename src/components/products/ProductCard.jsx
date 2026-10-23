@@ -1,9 +1,6 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, Smartphone } from "lucide-react";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card.jsx";
+import { Smartphone } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card.jsx";
 
 function getPriceLabel(price) {
   const normalizedPrice = String(price ?? "").trim();
@@ -16,9 +13,9 @@ export default function ProductCard({ product }) {
   return (
     <li className="product-grid__item">
       <Link
+        aria-label={`View ${productName} details`}
         className="product-card-link"
         to={`/products/${encodeURIComponent(product.id)}`}
-        aria-label={`View ${productName} details`}
       >
         <Card className="product-card">
           <div className="product-card__media">
@@ -38,13 +35,7 @@ export default function ProductCard({ product }) {
           <CardContent className="product-card__content">
             <span className="product-card__brand">{product.brand}</span>
             <h2 className="product-card__model">{product.model}</h2>
-            <div className="product-card__footer">
-              <p className="product-card__price">{getPriceLabel(product.price)}</p>
-              <span className="product-card__action">
-                View details
-                <ArrowRight size={15} strokeWidth={2} aria-hidden="true" />
-              </span>
-            </div>
+            <p className="product-card__price">{getPriceLabel(product.price)}</p>
           </CardContent>
         </Card>
       </Link>
