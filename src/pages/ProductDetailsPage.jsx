@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Smartphone } from "lucide-react";
 import AppHeader from "@/components/layout/AppHeader.jsx";
 import ProductActions from "@/components/products/ProductActions.jsx";
 import { Button } from "@/components/ui/button.jsx";
-import { productsCache } from "@/services/storage/cache.js";
+import { useCurrentProductStore } from "@/hooks/useCurrentProductStore.js";
+import { currentProductStore } from "@/store/currentProductStore.js";
 
 function formatPrice(price) {
   const normalizedPrice = String(price ?? "").trim();
@@ -82,43 +83,14 @@ function ProductErrorState({ isNotFound, onRetry }) {
 
 export default function ProductDetailsPage() {
   const { id } = useParams();
-  const [loadAttempt, setLoadAttempt] = useState(0);
-  const [resource, setResource] = useState({
-    id: null,
-    product: null,
-    status: "loading",
-    isStale: false,
-  });
+  const resource = useCurrentProductStore();
 
   useEffect(() => {
-    let isActive = true;
-
-    productsCache
-      .getProductDetail(id)
-      .then(({ product, isStale }) => {
-        if (isActive) {
-          setResource({ id, product, status: "ready", isStale });
-        }
-      })
-      .catch((error) => {
-        if (isActive) {
-          setResource({
-            id,
-            product: null,
-            status: error?.status === 404 ? "not-found" : "error",
-            isStale: false,
-          });
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [id, loadAttempt]);
+    void currentProductStore.load(id);
+  }, [id]);
 
   function handleRetry() {
-    setResource({ id, product: null, status: "loading", isStale: false });
-    setLoadAttempt((attempt) => attempt + 1);
+    void currentProductStore.load(id);
   }
 
   const currentResource =

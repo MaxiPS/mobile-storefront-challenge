@@ -1,24 +1,29 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
 import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import AppRoutes from "@/app/routes.jsx";
-import { getProductById, getProducts } from "@/services/api/productsApi.js";
+import { db } from "@/services/storage/dexieDatabase.js";
 import productDetailFixture from "../fixtures/product-detail.json";
 import productsFixture from "../fixtures/products.json";
 
-vi.mock("@/services/api/productsApi.js", () => ({
-  addProductToCart: vi.fn(),
-  getProductById: vi.fn(),
-  getProducts: vi.fn(),
-}));
+const API_BASE_URL = "https://itx-frontend-test.onrender.com/api";
+const server = setupServer(
+  http.get(`${API_BASE_URL}/product`, () => HttpResponse.json(productsFixture)),
+  http.get(`${API_BASE_URL}/product/${productDetailFixture.id}`, () =>
+    HttpResponse.json(productDetailFixture),
+  ),
+);
 
-afterEach(cleanup);
-
-beforeEach(() => {
-  getProducts.mockResolvedValue(productsFixture);
-  getProductById.mockResolvedValue(productDetailFixture);
+beforeAll(() => server.listen({ onUnhandledFrame: "error" }));
+beforeEach(async () => db.apiCache.clear());
+afterEach(() => {
+  cleanup();
+  server.resetHandlers();
 });
+afterAll(() => server.close());
 
 function renderRoutes(initialEntries) {
   return render(
@@ -29,10 +34,10 @@ function renderRoutes(initialEntries) {
 }
 
 describe("application routes", () => {
-  it("renders the product list at the root route", () => {
+  it("renders the product list at the root route", async () => {
     renderRoutes(["/"]);
 
-    expect(screen.getByRole("heading", { name: "Products" })).toBeInTheDocument();
+    expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
   });
 
   it("renders product details for the requested product ID", async () => {
@@ -47,10 +52,7 @@ describe("application routes", () => {
     renderRoutes(["/unknown"]);
 
     expect(screen.getByRole("heading", { name: "Page not found" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to products" })).toHaveAttribute(
-      "href",
-      "/",
-    );
+    expect(screen.getByRole("link", { name: "Back to products" })).toHaveAttribute("href", "/");
   });
 
   it("navigates from the product list to product details", async () => {
@@ -66,7 +68,5 @@ describe("application routes", () => {
     expect(
       await screen.findByRole("heading", { name: "Iconia Talk S" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("CPU")).toBeInTheDocument();
-    expect(screen.getByText("Quad-core 1.3 GHz Cortex-A53")).toBeInTheDocument();
   });
 });

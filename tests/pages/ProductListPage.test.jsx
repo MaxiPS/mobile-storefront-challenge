@@ -1,46 +1,49 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/app/App.jsx";
-import { getProducts } from "@/services/api/productsApi.js";
 import { PRODUCT_LIST_CACHE_KEY } from "@/services/storage/cache.js";
 import { db } from "@/services/storage/dexieDatabase.js";
 import { productRepository } from "@/services/storage/productRepository.js";
-import { appStore } from "@/store/appStore.js";
+import { cartStore } from "@/store/cartStore.js";
+import { productListStore } from "@/store/productListStore.js";
 import productsFixture from "../fixtures/products.json";
 
-vi.mock("@/services/api/productsApi.js", () => ({
-  addProductToCart: vi.fn(),
-  getProductById: vi.fn(),
-  getProducts: vi.fn(),
-}));
+const PRODUCTS_URL = "https://itx-frontend-test.onrender.com/api/product";
+const server = setupServer(
+  http.get(PRODUCTS_URL, () => HttpResponse.json(productsFixture)),
+);
+let requests = [];
+
+beforeAll(() => {
+  server.events.on("request:start", ({ request }) => {
+    requests.push({ method: request.method, url: request.url });
+  });
+  server.listen({ onUnhandledFrame: "error" });
+});
+
+afterAll(() => server.close());
 
 afterEach(() => {
   cleanup();
+  server.resetHandlers();
   vi.restoreAllMocks();
 });
 
-async function clearDatabase() {
-  await db.transaction(
-    "rw",
-    db.apiCache,
-    db.products,
-    db.productDetails,
-    db.appState,
-    async () => {
-      await Promise.all([
-        db.apiCache.clear(),
-        db.products.clear(),
-        db.productDetails.clear(),
-        db.appState.clear(),
-      ]);
-    },
+function expectProductRequests(count) {
+  expect(requests).toEqual(
+    Array.from({ length: count }, () => ({ method: "GET", url: PRODUCTS_URL })),
   );
 }
 
+async function clearDatabase() {
+  await db.apiCache.clear();
+}
+
 async function seedProductCache(products, expiresAt) {
-  await productRepository.replaceProducts(products);
   await db.apiCache.put({
     key: PRODUCT_LIST_CACHE_KEY,
     response: products,
@@ -50,17 +53,30 @@ async function seedProductCache(products, expiresAt) {
 }
 
 beforeEach(async () => {
-  vi.clearAllMocks();
+  requests = [];
   await clearDatabase();
-  await appStore.setCartCount(0);
-  getProducts.mockResolvedValue(productsFixture);
+  cartStore.setCartCount(0);
+  await productListStore.setSearchTerm("");
 });
 
 describe("product list page", () => {
-  it("loads and caches products, then searches Dexie without another API request", async () => {
-    const user = userEvent.setup();
-    const searchSpy = vi.spyOn(productRepository, "searchProductsLocal");
+  it("loads the product list from the API when the cache is empty", async () => {
+    render(<App />);
 
+    expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
+    expectProductRequests(1);
+  });
+
+  it("loads a previously cached product list without calling the API", async () => {
+    await seedProductCache(productsFixture, Date.now() + 60_000);
+
+    render(<App />);
+
+    expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
+    expectProductRequests(0);
+  });
+
+  it("renders product cards", async () => {
     render(<App />);
 
     expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
@@ -69,21 +85,34 @@ describe("product list page", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Price unavailable")).toBeInTheDocument();
     expect(screen.getByText("170 \u20ac")).toBeInTheDocument();
+  });
+
+  it("renders catalog navigation", async () => {
+    render(<App />);
+
+    await screen.findByText("Iconia Talk S");
     expect(
       screen.getByRole("link", { name: "Mobile Storefront home" }),
     ).toHaveAttribute("href", "/");
     expect(
       screen.getByRole("navigation", { name: "breadcrumb" }),
     ).toBeInTheDocument();
-    expect(getProducts).toHaveBeenCalledTimes(1);
-    expect(await db.products.count()).toBe(productsFixture.length);
+  });
+
+  it("filters by model in Dexie without another API request", async () => {
+    const user = userEvent.setup();
+    const searchSpy = vi.spyOn(productRepository, "searchProductsLocal");
+    render(<App />);
+
+    await screen.findByText("Iconia Talk S");
+    expectProductRequests(1);
 
     await user.type(screen.getByRole("searchbox", { name: "Search products" }), "jAdE");
 
     expect(await screen.findByText("Liquid Jade 2")).toBeInTheDocument();
     expect(screen.queryByText("Iconia Talk S")).not.toBeInTheDocument();
     expect(searchSpy).toHaveBeenCalledWith("jAdE");
-    expect(getProducts).toHaveBeenCalledTimes(1);
+    expectProductRequests(1);
   });
 
   it("searches product brands case-insensitively in Dexie", async () => {
@@ -100,7 +129,7 @@ describe("product list page", () => {
     expect(await screen.findByText("Liquid Jade 2")).toBeInTheDocument();
     expect(screen.getByText("Iconia Talk S")).toBeInTheDocument();
     expect(searchSpy).toHaveBeenCalledWith("aCeR");
-    expect(getProducts).toHaveBeenCalledTimes(1);
+    expectProductRequests(1);
   });
 
   it("does not duplicate the list request when React Strict Mode replays effects", async () => {
@@ -111,16 +140,7 @@ describe("product list page", () => {
     );
 
     expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
-    expect(getProducts).toHaveBeenCalledTimes(1);
-  });
-
-  it("reads a valid cached list from Dexie without calling the API", async () => {
-    await seedProductCache(productsFixture, Date.now() + 60_000);
-
-    render(<App />);
-
-    expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
-    expect(getProducts).not.toHaveBeenCalled();
+    expectProductRequests(1);
   });
 
   it("refreshes an expired cache when the list is opened", async () => {
@@ -133,7 +153,7 @@ describe("product list page", () => {
 
     expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
     expect(screen.queryByText("Old cached model")).not.toBeInTheDocument();
-    expect(getProducts).toHaveBeenCalledTimes(1);
+    expectProductRequests(1);
     await waitFor(async () => {
       expect(await db.apiCache.count()).toBe(1);
     });
@@ -141,21 +161,22 @@ describe("product list page", () => {
 
   it("shows a loading state while the list request is pending", async () => {
     let resolveProducts;
-    getProducts.mockReturnValue(
+    server.use(http.get(PRODUCTS_URL, () =>
       new Promise((resolve) => {
         resolveProducts = resolve;
       }),
-    );
+    ));
 
     render(<App />);
 
     expect(screen.getByRole("status")).toHaveTextContent("Loading products");
-    resolveProducts(productsFixture);
+    await waitFor(() => expect(resolveProducts).toBeTypeOf("function"));
+    resolveProducts(HttpResponse.json(productsFixture));
     expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
   });
 
   it("shows an empty state when the API returns no products", async () => {
-    getProducts.mockResolvedValue([]);
+    server.use(http.get(PRODUCTS_URL, () => HttpResponse.json([])));
 
     render(<App />);
 
@@ -173,14 +194,18 @@ describe("product list page", () => {
     );
 
     expect(await screen.findByText("No products found")).toBeInTheDocument();
-    expect(getProducts).toHaveBeenCalledTimes(1);
+    expectProductRequests(1);
   });
 
   it("lets the user retry after a list request fails", async () => {
     const user = userEvent.setup();
-    getProducts
-      .mockRejectedValueOnce(new Error("Network unavailable"))
-      .mockResolvedValueOnce(productsFixture);
+    let attempt = 0;
+    server.use(http.get(PRODUCTS_URL, () => {
+      attempt += 1;
+      return attempt === 1
+        ? HttpResponse.error()
+        : HttpResponse.json(productsFixture);
+    }));
 
     render(<App />);
 
@@ -188,11 +213,11 @@ describe("product list page", () => {
     await user.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
-    expect(getProducts).toHaveBeenCalledTimes(2);
+    expectProductRequests(2);
   });
 
-  it("shows the hydrated cart count in the shared header", async () => {
-    await appStore.setCartCount(3);
+  it("shows the cart count in the shared header", async () => {
+    cartStore.setCartCount(3);
 
     render(<App />);
 
