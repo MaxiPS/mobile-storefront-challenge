@@ -314,71 +314,6 @@ button {
   min-width: 0;
 }
 
-.product-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.55rem;
-  padding-block: 0.35rem 1.25rem;
-}
-
-.product-pagination__status {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-.product-pagination__pages {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-}
-
-.product-pagination__arrow[data-slot="button"],
-.product-pagination__page[data-slot="button"] {
-  width: 2.2rem;
-  min-width: 2.2rem;
-  height: 2.2rem;
-  padding: 0;
-  color: #465877;
-  background: #fff;
-  border: 1px solid #dce3ed;
-  border-radius: 0.35rem;
-  box-shadow: none;
-  font-size: 0.8rem;
-}
-
-.product-pagination__arrow[data-slot="button"]:hover:not(:disabled),
-.product-pagination__page[data-slot="button"]:hover {
-  color: var(--store-accent);
-  background: var(--store-accent-soft);
-  border-color: #c4d6f3;
-}
-
-.product-pagination__page[data-slot="button"].is-current {
-  color: #fff;
-  background: var(--store-accent);
-  border-color: var(--store-accent);
-}
-
-.product-pagination__page[data-slot="button"].is-current:hover {
-  color: #fff;
-  background: var(--store-accent-hover);
-  border-color: var(--store-accent-hover);
-}
-
-.product-pagination__arrow[data-slot="button"]:focus-visible,
-.product-pagination__page[data-slot="button"]:focus-visible {
-  outline: 3px solid rgb(23 100 232 / 20%);
-  outline-offset: 2px;
-}
-
 .product-card-link {
   display: block;
   height: 100%;
@@ -957,21 +892,6 @@ button {
 
   .product-actions__selectors {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .product-pagination {
-    gap: 0.3rem;
-  }
-
-  .product-pagination__pages {
-    gap: 0.3rem;
-  }
-
-  .product-pagination__arrow[data-slot="button"],
-  .product-pagination__page[data-slot="button"] {
-    width: 2rem;
-    min-width: 2rem;
-    height: 2rem;
   }
 
   .product-specifications__row {
