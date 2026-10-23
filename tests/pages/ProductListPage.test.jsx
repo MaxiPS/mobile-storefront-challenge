@@ -132,6 +132,21 @@ describe("product list page", () => {
     expectProductRequests(1);
   });
 
+  it("fuzzy searches misspelled model names locally without another API request", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByText("Iconia Talk S");
+    await user.type(
+      screen.getByRole("searchbox", { name: "Search products" }),
+      "jdae",
+    );
+
+    expect(await screen.findByText("Liquid Jade 2")).toBeInTheDocument();
+    expect(screen.queryByText("Iconia Talk S")).not.toBeInTheDocument();
+    expectProductRequests(1);
+  });
+
   it("does not duplicate the list request when React Strict Mode replays effects", async () => {
     render(
       <StrictMode>

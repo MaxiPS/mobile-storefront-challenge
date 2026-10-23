@@ -21,6 +21,27 @@ describe("local catalog search", () => {
     await expect(repository.searchProductsLocal("ACER")).resolves.toEqual(productsFixture);
   });
 
+  it("matches a misspelled brand", async () => {
+    const repository = createProductRepository(database);
+    await expect(repository.searchProductsLocal("acr")).resolves.toEqual(productsFixture);
+  });
+
+  it("matches a model when adjacent letters are transposed", async () => {
+    const repository = createProductRepository(database);
+    await expect(repository.searchProductsLocal("jdae")).resolves.toEqual([productsFixture[1]]);
+  });
+
+  it("does not fuzzy match fields other than brand and model", async () => {
+    await database.apiCache.put({
+      key: "/product",
+      response: [{ ...productsFixture[0], brand: "Nokia", model: "X10", price: "jdae" }],
+      expiresAt: 1,
+    });
+    const repository = createProductRepository(database);
+
+    await expect(repository.searchProductsLocal("jdae")).resolves.toEqual([]);
+  });
+
   it("returns all cached products for an empty term", async () => {
     const repository = createProductRepository(database);
     await expect(repository.searchProductsLocal("")).resolves.toEqual(productsFixture);
