@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Smartphone } from "lucide-react";
+import { ArrowRight, Smartphone } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -38,7 +38,13 @@ export default function ProductCard({ product }) {
           <CardContent className="product-card__content">
             <span className="product-card__brand">{product.brand}</span>
             <h2 className="product-card__model">{product.model}</h2>
-            <p className="product-card__price">{getPriceLabel(product.price)}</p>
+            <div className="product-card__footer">
+              <p className="product-card__price">{getPriceLabel(product.price)}</p>
+              <span className="product-card__action">
+                View details
+                <ArrowRight size={15} strokeWidth={2} aria-hidden="true" />
+              </span>
+            </div>
           </CardContent>
         </Card>
       </Link>

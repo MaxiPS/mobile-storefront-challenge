@@ -9,7 +9,7 @@ const ESTIMATED_ROW_HEIGHT = 420;
 function getColumnCount(viewportWidth) {
   if (viewportWidth <= 420) return 1;
   if (viewportWidth <= 760) return 2;
-  if (viewportWidth <= 1050) return 3;
+  if (viewportWidth <= 900) return 3;
   return 4;
 }
 

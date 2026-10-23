@@ -1,4 +1,11 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { http, HttpResponse } from "msw";
@@ -86,6 +93,21 @@ describe("product details page", () => {
     expect(screen.getByText("170 \u20ac")).toBeInTheDocument();
   });
 
+  it("shows a product image placeholder when the image cannot be loaded", async () => {
+    renderApplication();
+
+    await screen.findByRole("heading", { name: "Iconia Talk S" });
+    fireEvent.error(screen.getByRole("img", { name: "Acer Iconia Talk S" }));
+
+    expect(
+      screen.getByRole("img", { name: "Acer Iconia Talk S" }),
+    ).toHaveClass("product-detail-media__placeholder");
+    expect(screen.queryByRole("img", { name: "Acer Iconia Talk S" })).not.toHaveAttribute(
+      "src",
+      productDetailFixture.imgUrl,
+    );
+  });
+
   it("shows the available product specifications", async () => {
     renderApplication();
 
@@ -105,16 +127,32 @@ describe("product details page", () => {
     expect(screen.getByText("260 g")).toBeInTheDocument();
   });
 
-  it("shows color and storage selectors with their first options selected", async () => {
+  it("shows color swatches and storage options with their first values selected", async () => {
     renderApplication();
 
     await screen.findByRole("heading", { name: "Iconia Talk S" });
 
-    expect(screen.getByRole("combobox", { name: "Color" })).toHaveTextContent(
-      "Black",
+    expect(screen.getByRole("radio", { name: "Black" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "16 GB" })).toBeChecked();
+  });
+
+  it("shows the home, products, and current product breadcrumb trail", async () => {
+    renderApplication();
+
+    await screen.findByRole("heading", { name: "Iconia Talk S" });
+
+    const breadcrumb = screen.getByRole("navigation", { name: "breadcrumb" });
+    expect(within(breadcrumb).getByRole("link", { name: "Home" })).toHaveAttribute(
+      "href",
+      "/",
     );
-    expect(screen.getByRole("combobox", { name: "Storage" })).toHaveTextContent(
-      "16 GB",
+    expect(within(breadcrumb).getByRole("link", { name: "Products" })).toHaveAttribute(
+      "href",
+      "/",
+    );
+    expect(within(breadcrumb).getByText("Iconia Talk S")).toHaveAttribute(
+      "aria-current",
+      "page",
     );
   });
 
@@ -126,7 +164,7 @@ describe("product details page", () => {
     const specifications = screen.getByRole("heading", {
       name: "Specifications",
     });
-    const colorSelector = screen.getByRole("combobox", { name: "Color" });
+    const colorSelector = screen.getByRole("group", { name: "Color" });
 
     expect(
       specifications.compareDocumentPosition(colorSelector) &
@@ -158,7 +196,7 @@ describe("product details page", () => {
     renderApplication();
 
     await screen.findByRole("heading", { name: "Iconia Talk S" });
-    await user.click(screen.getByRole("link", { name: "Back to products" }));
+    await user.click(screen.getByRole("link", { name: "Home" }));
 
     expect(await screen.findByRole("heading", { name: "Products" })).toBeInTheDocument();
     expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
@@ -169,9 +207,7 @@ describe("product details page", () => {
     renderApplication();
 
     await screen.findByRole("heading", { name: "Iconia Talk S" });
-    const storageSelect = screen.getByRole("combobox", { name: "Storage" });
-    storageSelect.focus();
-    await user.keyboard("{Enter}{ArrowDown}{Enter}");
+    await user.click(screen.getByRole("radio", { name: "32 GB" }));
     await user.click(screen.getByRole("button", { name: "Add to cart" }));
 
     await waitFor(() => expect(cartPayloads).toEqual([{
