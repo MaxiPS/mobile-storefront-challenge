@@ -2,10 +2,12 @@ import { expect, test } from "@playwright/test";
 import productDetail from "../tests/fixtures/product-detail.json" with { type: "json" };
 import products from "../tests/fixtures/products.json" with { type: "json" };
 
+const firstProduct = products[0];
+const firstProductLinkName = `View ${firstProduct.brand} ${firstProduct.model} details`;
 const API_URL = "https://itx-frontend-test.onrender.com/api";
 const API_HOST = "https://itx-frontend-test.onrender.com";
 
-async function mockAssessmentApi(page) {
+async function mockAssessmentApi(page, productCatalog = products) {
   let cartCount = 0;
   const corsHeaders = {
     "access-control-allow-origin": "*",
@@ -23,7 +25,7 @@ async function mockAssessmentApi(page) {
     }
 
     if (request.method() === "GET" && url.pathname === `${new URL(API_URL).pathname}/product`) {
-      await route.fulfill({ status: 200, headers: corsHeaders, json: products });
+      await route.fulfill({ status: 200, headers: corsHeaders, json: productCatalog });
       return;
     }
 
@@ -53,6 +55,15 @@ async function mockAssessmentApi(page) {
   );
 }
 
+function createVirtualizedProductCatalog(size) {
+  return Array.from({ length: size }, (_, index) => ({
+    ...products[0],
+    id: `virtual-product-${index + 1}`,
+    model: `Virtual Product ${index + 1}`,
+    imgUrl: "",
+  }));
+}
+
 test("supports keyboard shopping and restores the cart after reload", async ({ page }) => {
   await mockAssessmentApi(page);
   await page.goto("/");
@@ -68,7 +79,7 @@ test("supports keyboard shopping and restores the cart after reload", async ({ p
   await expect(page.getByRole("searchbox", { name: "Search products" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(
-    page.getByRole("link", { name: "View Acer Iconia Talk S details" }),
+    page.getByRole("link", { name: firstProductLinkName }),
   ).toBeFocused();
   await page.keyboard.press("Enter");
 
@@ -105,7 +116,7 @@ test("does not show the keyboard focus ring after pointer navigation", async ({ 
   await mockAssessmentApi(page);
   await page.goto("/");
 
-  await page.getByRole("link", { name: "View Acer Iconia Talk S details" }).click();
+  await page.getByRole("link", { name: firstProductLinkName }).click();
   await expect(page.getByRole("heading", { name: productDetail.model })).toBeVisible();
   await expect(page.locator("#main-content")).toBeFocused();
   await expect.poll(() =>
@@ -118,7 +129,7 @@ test("does not show the keyboard focus ring after pointer navigation", async ({ 
 test("keeps the product grid responsive without horizontal overflow", async ({ page }) => {
   await mockAssessmentApi(page);
   await page.goto("/");
-  await expect(page.getByText("Iconia Talk S")).toBeVisible();
+  await expect(page.getByText(firstProduct.model)).toBeVisible();
 
   const grid = page.locator(".product-grid__row-items").first();
   for (const [width, expectedColumns] of [[390, 1], [600, 2], [1000, 4]]) {
@@ -134,4 +145,42 @@ test("keeps the product grid responsive without horizontal overflow", async ({ p
     );
     expect(documentWidth).toBeLessThanOrEqual(width);
   }
+});
+
+test("virtualizes product cards while scrolling to the end of the catalog", async ({ page }) => {
+  // Given the API provides a large catalog and product requests are counted
+  const productCatalog = createVirtualizedProductCatalog(100);
+  const productListUrl = `${API_URL}/product`;
+  const productLinks = page.locator('a[href^="/products/"]');
+  const firstProductLink = page.getByRole("link", {
+    name: `View ${productCatalog[0].brand} ${productCatalog[0].model} details`,
+  });
+  const lastProduct = page.getByRole("link", {
+    name: `View ${productCatalog.at(-1).brand} ${productCatalog.at(-1).model} details`,
+  });
+  let productListRequests = 0;
+
+  await mockAssessmentApi(page, productCatalog);
+  page.on("request", (request) => {
+    if (request.method() === "GET" && request.url() === productListUrl) {
+      productListRequests += 1;
+    }
+  });
+
+  // When the user opens the catalog
+  await page.goto("/");
+
+  // Then only a window of the catalog is rendered initially
+  await expect(firstProductLink).toBeVisible();
+  await expect(lastProduct).toHaveCount(0);
+  expect(await productLinks.count()).toBeLessThan(productCatalog.length);
+
+  // When the user scrolls to the end of the catalog
+  await page.mouse.wheel(0, 50_000);
+
+  // Then the final products are reachable without rendering the entire catalog or refetching it
+  await expect(lastProduct).toBeVisible();
+  await expect(firstProductLink).toHaveCount(0);
+  expect(await productLinks.count()).toBeLessThan(productCatalog.length);
+  expect(productListRequests).toBe(1);
 });
