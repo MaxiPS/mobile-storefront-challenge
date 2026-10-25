@@ -116,7 +116,7 @@ Representative GET responses are stored in `tests/fixtures/`. API contract and p
 
 ## Testing and quality
 
-Functional work follows Red-Green-Refactor. Vitest and React Testing Library cover API behavior, IndexedDB persistence, invalid responses, cache failures, and race conditions. Playwright covers keyboard shopping, route focus, cart restoration after reload, and responsive grid layouts. The CI workflow runs tests with coverage, a production build, ESLint, and Chromium E2E on pull requests targeting `main`.
+Functional work follows Red-Green-Refactor. Vitest and React Testing Library cover API behavior, IndexedDB persistence, invalid responses, cache failures, and race conditions. Playwright covers keyboard shopping, route focus, cart restoration after reload, responsive grid layouts, and product virtualization during real browser scrolling. The CI workflow runs tests with coverage, a production build, ESLint, and Chromium E2E on pull requests targeting `main`.
 
 Run the same checks locally:
 

@@ -9,6 +9,9 @@ import { db } from "@/services/storage/dexieDatabase.js";
 import productDetailFixture from "../fixtures/product-detail.json";
 import productsFixture from "../fixtures/products.json";
 
+const firstProduct = productsFixture[0];
+const firstProductLinkName = `View ${firstProduct.brand} ${firstProduct.model} details`;
+
 const API_BASE_URL = "https://itx-frontend-test.onrender.com/api";
 const server = setupServer(
   http.get(`${API_BASE_URL}/product`, () => HttpResponse.json(productsFixture)),
@@ -17,7 +20,7 @@ const server = setupServer(
   ),
 );
 
-beforeAll(() => server.listen({ onUnhandledFrame: "error" }));
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 beforeEach(async () => db.apiCache.clear());
 afterEach(() => {
   cleanup();
@@ -37,14 +40,14 @@ describe("application routes", () => {
   it("renders the product list at the root route", async () => {
     renderRoutes(["/"]);
 
-    expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
+    expect(await screen.findByText(firstProduct.model)).toBeInTheDocument();
   });
 
   it("renders product details for the requested product ID", async () => {
     renderRoutes([`/products/${productDetailFixture.id}`]);
 
     expect(
-      await screen.findByRole("heading", { name: "Iconia Talk S" }),
+      await screen.findByRole("heading", { name: productDetailFixture.model }),
     ).toBeInTheDocument();
   });
 
@@ -61,12 +64,12 @@ describe("application routes", () => {
 
     await user.click(
       await screen.findByRole("link", {
-        name: "View Acer Iconia Talk S details",
+        name: firstProductLinkName,
       }),
     );
 
     expect(
-      await screen.findByRole("heading", { name: "Iconia Talk S" }),
+      await screen.findByRole("heading", { name: productDetailFixture.model }),
     ).toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveFocus();
   });
@@ -75,14 +78,14 @@ describe("application routes", () => {
     const user = userEvent.setup();
     renderRoutes(["/"]);
 
-    await screen.findByText("Iconia Talk S");
+    await screen.findByText(firstProduct.model);
     await user.tab();
     expect(screen.getByRole("link", { name: "ITX Store home" })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole("searchbox", { name: "Search products" })).toHaveFocus();
     await user.tab();
     expect(
-      screen.getByRole("link", { name: "View Acer Iconia Talk S details" }),
+      screen.getByRole("link", { name: firstProductLinkName }),
     ).toHaveFocus();
   });
 });

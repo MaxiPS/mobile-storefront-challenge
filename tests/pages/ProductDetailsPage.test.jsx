@@ -18,6 +18,9 @@ import { cartStore } from "@/store/cartStore.js";
 import productDetailFixture from "../fixtures/product-detail.json";
 import productsFixture from "../fixtures/products.json";
 
+const productModel = productDetailFixture.model;
+const productName = [productDetailFixture.brand, productModel].filter(Boolean).join(" ");
+
 const API_BASE_URL = "https://itx-frontend-test.onrender.com/api";
 const DETAIL_URL = `${API_BASE_URL}/product/${productDetailFixture.id}`;
 const LIST_URL = `${API_BASE_URL}/product`;
@@ -37,7 +40,7 @@ beforeAll(() => {
   server.events.on("request:start", ({ request }) => {
     requests.push({ method: request.method, url: request.url });
   });
-  server.listen({ onUnhandledFrame: "error" });
+  server.listen({ onUnhandledRequest: "error" });
 });
 afterEach(() => {
   cleanup();
@@ -78,7 +81,7 @@ describe("product details page", () => {
     renderApplication();
 
     expect(
-      await screen.findByRole("heading", { name: "Iconia Talk S" }),
+      await screen.findByRole("heading", { name: productModel }),
     ).toBeInTheDocument();
     expectDetailRequests(1);
   });
@@ -86,33 +89,31 @@ describe("product details page", () => {
   it("shows the product identity and price", async () => {
     renderApplication();
 
-    await screen.findByRole("heading", { name: "Iconia Talk S" });
-    expect(screen.getByText("Acer")).toBeInTheDocument();
+    await screen.findByRole("heading", { name: productModel });
+    expect(screen.getByText(productDetailFixture.brand)).toBeInTheDocument();
     expect(
-      screen.getByRole("img", { name: "Acer Iconia Talk S" }),
+      screen.getByRole("img", { name: productName }),
     ).toHaveAttribute("src", productDetailFixture.imgUrl);
-    expect(screen.getByText("170 \u20ac")).toBeInTheDocument();
+    expect(screen.getByText(`${productDetailFixture.price} \u20ac`)).toBeInTheDocument();
   });
 
-  it("shows a product image placeholder when the image cannot be loaded", async () => {
+  it("shows an accessible image placeholder when the image cannot be loaded", async () => {
     renderApplication();
 
-    await screen.findByRole("heading", { name: "Iconia Talk S" });
-    fireEvent.error(screen.getByRole("img", { name: "Acer Iconia Talk S" }));
+    const productImage = await screen.findByRole("img", {
+      name: productName,
+    });
+    fireEvent.error(productImage);
 
-    expect(
-      screen.getByRole("img", { name: "Acer Iconia Talk S" }),
-    ).toHaveClass("product-detail-media__placeholder");
-    expect(screen.queryByRole("img", { name: "Acer Iconia Talk S" })).not.toHaveAttribute(
-      "src",
-      productDetailFixture.imgUrl,
-    );
+    const placeholder = screen.getByRole("img", { name: productName });
+    expect(placeholder).toHaveAttribute("aria-label", productName);
+    expect(placeholder).not.toHaveAttribute("src");
   });
 
   it("shows the available product specifications", async () => {
     renderApplication();
 
-    await screen.findByRole("heading", { name: "Iconia Talk S" });
+    await screen.findByRole("heading", { name: productModel });
     expect(screen.getByText("Quad-core 1.3 GHz Cortex-A53")).toBeInTheDocument();
     expect(screen.getByText("2 GB RAM")).toBeInTheDocument();
     expect(screen.getByText("Android 6.0 (Marshmallow)")).toBeInTheDocument();
@@ -131,7 +132,7 @@ describe("product details page", () => {
   it("shows color swatches and storage options with their first values selected", async () => {
     renderApplication();
 
-    await screen.findByRole("heading", { name: "Iconia Talk S" });
+    await screen.findByRole("heading", { name: productModel });
 
     expect(screen.getByRole("radio", { name: "Black" })).toBeChecked();
     expect(screen.getByRole("radio", { name: "16 GB" })).toBeChecked();
@@ -140,7 +141,7 @@ describe("product details page", () => {
   it("shows products and the current product in the breadcrumb trail", async () => {
     renderApplication();
 
-    await screen.findByRole("heading", { name: "Iconia Talk S" });
+    await screen.findByRole("heading", { name: productModel });
 
     const breadcrumb = screen.getByRole("navigation", { name: "breadcrumb" });
     expect(within(breadcrumb).getByRole("link", { name: "Products" })).toHaveAttribute(
@@ -148,7 +149,7 @@ describe("product details page", () => {
       "/",
     );
     expect(within(breadcrumb).queryByRole("link", { name: "Home" })).not.toBeInTheDocument();
-    expect(within(breadcrumb).getByText("Iconia Talk S")).toHaveAttribute(
+    expect(within(breadcrumb).getByText(productModel)).toHaveAttribute(
       "aria-current",
       "page",
     );
@@ -157,7 +158,7 @@ describe("product details page", () => {
   it("presents product specifications before purchase actions", async () => {
     renderApplication();
 
-    await screen.findByRole("heading", { name: "Iconia Talk S" });
+    await screen.findByRole("heading", { name: productModel });
 
     const specifications = screen.getByRole("heading", {
       name: "Specifications",
@@ -173,16 +174,16 @@ describe("product details page", () => {
   it("omits the specifications section when optional details are unavailable", async () => {
     server.use(http.get(DETAIL_URL, () => HttpResponse.json({
       id: productDetailFixture.id,
-      brand: "Acer",
-      model: "Iconia Talk S",
-      price: "170",
+      brand: productDetailFixture.brand,
+      model: productModel,
+      price: productDetailFixture.price,
       options: productDetailFixture.options,
     })));
 
     renderApplication();
 
     expect(
-      await screen.findByRole("heading", { name: "Iconia Talk S" }),
+      await screen.findByRole("heading", { name: productModel }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("heading", { name: "Specifications" }),
@@ -193,21 +194,25 @@ describe("product details page", () => {
     const user = userEvent.setup();
     renderApplication();
 
-    await screen.findByRole("heading", { name: "Iconia Talk S" });
+    await screen.findByRole("heading", { name: productModel });
     await user.click(screen.getByRole("link", { name: "Products" }));
 
     expect(await screen.findByRole("heading", { name: "Products" })).toBeInTheDocument();
-    expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
+    expect(await screen.findByText(productModel)).toBeInTheDocument();
   });
 
   it("posts the selected variant codes to the cart endpoint", async () => {
     const user = userEvent.setup();
-    renderApplication();
 
-    await screen.findByRole("heading", { name: "Iconia Talk S" });
+    // Given a product detail page with its default variant selected
+    renderApplication();
+    await screen.findByRole("heading", { name: productModel });
+
+    // When the user selects 32 GB storage and adds the product
     await user.click(screen.getByRole("radio", { name: "32 GB" }));
     await user.click(screen.getByRole("button", { name: "Add to cart" }));
 
+    // Then the API receives the selected product variant
     await waitFor(() => expect(cartPayloads).toEqual([{
       id: productDetailFixture.id,
       colorCode: 1000,
@@ -222,7 +227,7 @@ describe("product details page", () => {
     const user = userEvent.setup();
     renderApplication();
 
-    await screen.findByRole("heading", { name: "Iconia Talk S" });
+    await screen.findByRole("heading", { name: productModel });
     await user.click(screen.getByRole("button", { name: "Add to cart" }));
 
     expect(await screen.findByText("Added to cart")).toBeInTheDocument();
@@ -240,7 +245,7 @@ describe("product details page", () => {
     }));
     renderApplication();
 
-    await screen.findByRole("heading", { name: "Iconia Talk S" });
+    await screen.findByRole("heading", { name: productModel });
     const addButton = screen.getByRole("button", { name: "Add to cart" });
     await user.click(addButton);
     await user.click(addButton);
@@ -261,7 +266,7 @@ describe("product details page", () => {
     ));
     renderApplication();
 
-    await screen.findByRole("heading", { name: "Iconia Talk S" });
+    await screen.findByRole("heading", { name: productModel });
     const addButton = screen.getByRole("button", { name: "Add to cart" });
     await user.click(addButton);
 
@@ -277,7 +282,7 @@ describe("product details page", () => {
     server.use(http.post(CART_URL, () => HttpResponse.error()));
     renderApplication();
 
-    await screen.findByRole("heading", { name: "Iconia Talk S" });
+    await screen.findByRole("heading", { name: productModel });
     await user.click(screen.getByRole("button", { name: "Add to cart" }));
 
     expect(
@@ -290,7 +295,7 @@ describe("product details page", () => {
     server.use(http.post(CART_URL, () => HttpResponse.json({ count: "1" })));
     renderApplication();
 
-    await screen.findByRole("heading", { name: "Iconia Talk S" });
+    await screen.findByRole("heading", { name: productModel });
     await user.click(screen.getByRole("button", { name: "Add to cart" }));
 
     expect(
@@ -312,7 +317,7 @@ describe("product details page", () => {
     await waitFor(() => expect(resolveProduct).toBeTypeOf("function"));
     resolveProduct(HttpResponse.json(productDetailFixture));
     expect(
-      await screen.findByRole("heading", { name: "Iconia Talk S" }),
+      await screen.findByRole("heading", { name: productModel }),
     ).toBeInTheDocument();
   });
 
@@ -333,7 +338,7 @@ describe("product details page", () => {
     await user.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(
-      await screen.findByRole("heading", { name: "Iconia Talk S" }),
+      await screen.findByRole("heading", { name: productModel }),
     ).toBeInTheDocument();
     expectDetailRequests(2);
   });
@@ -381,7 +386,7 @@ describe("product details page", () => {
     renderApplication();
 
     expect(
-      await screen.findByRole("heading", { name: "Iconia Talk S" }),
+      await screen.findByRole("heading", { name: productModel }),
     ).toBeInTheDocument();
     expectDetailRequests(0);
   });
@@ -399,7 +404,7 @@ describe("product details page", () => {
     renderApplication();
 
     expect(
-      await screen.findByRole("heading", { name: "Iconia Talk S" }),
+      await screen.findByRole("heading", { name: productModel }),
     ).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent(
       "Showing saved product details",
@@ -411,7 +416,7 @@ describe("product details page", () => {
     renderApplication({ strict: true });
 
     expect(
-      await screen.findByRole("heading", { name: "Iconia Talk S" }),
+      await screen.findByRole("heading", { name: productModel }),
     ).toBeInTheDocument();
     expectDetailRequests(1);
   });

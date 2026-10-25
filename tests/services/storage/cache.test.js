@@ -42,9 +42,16 @@ describe("IndexedDB response cache", () => {
   });
 
   it("serves a fresh cached product detail", async () => {
-    await cache.getProductDetail(detail.id);
+    const expectedResult = { product: detail, isStale: false };
+
+    // Given the detail was fetched and cached
+    await expect(cache.getProductDetail(detail.id)).resolves.toEqual(expectedResult);
     fetchProductById.mockClear();
-    await cache.getProductDetail(detail.id);
+
+    // When the same fresh detail is requested again
+    await expect(cache.getProductDetail(detail.id)).resolves.toEqual(expectedResult);
+
+    // Then the cached response is returned without another API call
     expect(fetchProductById).not.toHaveBeenCalled();
     expect(await database.apiCache.count()).toBe(1);
   });
@@ -145,13 +152,17 @@ describe("IndexedDB response cache", () => {
   });
 
   it("shares concurrent product list requests for the same cache key", async () => {
+    // Given the API response is held pending
     let resolveProducts;
     fetchProducts.mockImplementationOnce(
       () => new Promise((resolve) => { resolveProducts = resolve; }),
     );
 
+    // When the same product list is requested twice at the same time
     const firstRequest = cache.getProducts();
     const secondRequest = cache.getProducts();
+
+    // Then both callers share one API request and receive its result
     await vi.waitFor(() => expect(fetchProducts).toHaveBeenCalledOnce());
     resolveProducts(products);
 
@@ -162,13 +173,17 @@ describe("IndexedDB response cache", () => {
   });
 
   it("shares concurrent product detail requests for the same product", async () => {
+    // Given the product detail API response is held pending
     let resolveProduct;
     fetchProductById.mockImplementationOnce(
       () => new Promise((resolve) => { resolveProduct = resolve; }),
     );
 
+    // When the same product detail is requested twice at the same time
     const firstRequest = cache.getProductDetail(detail.id);
     const secondRequest = cache.getProductDetail(detail.id);
+
+    // Then both callers share one API request and receive its result
     await vi.waitFor(() => expect(fetchProductById).toHaveBeenCalledOnce());
     resolveProduct(detail);
 

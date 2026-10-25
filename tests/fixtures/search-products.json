@@ -1,0 +1,23 @@
+[
+  {
+    "id": "search-product-1",
+    "brand": "Northwind",
+    "model": "Phone One",
+    "price": "100",
+    "imgUrl": ""
+  },
+  {
+    "id": "search-product-2",
+    "brand": "NORTHWIND",
+    "model": "Phone Two",
+    "price": "200",
+    "imgUrl": ""
+  },
+  {
+    "id": "search-product-3",
+    "brand": "Contoso",
+    "model": "Phone Three",
+    "price": "300",
+    "imgUrl": ""
+  }
+]

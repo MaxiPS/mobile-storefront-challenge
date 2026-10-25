@@ -17,7 +17,7 @@ beforeAll(() => {
   server.events.on("request:start", ({ request }) => {
     requests.push({ method: request.method, url: request.url });
   });
-  server.listen({ onUnhandledFrame: "error" });
+  server.listen({ onUnhandledRequest: "error" });
 });
 afterEach(() => {
   requests = [];
@@ -38,15 +38,18 @@ describe("productsApi", () => {
   });
 
   it("loads a product detail by its encoded identifier", async () => {
-    server.use(http.get(`${API_BASE_URL}/product/${productDetailFixture.id}`, () =>
-      HttpResponse.json(productDetailFixture),
+    const productId = "model/with spaces?";
+    const productUrl = `${API_BASE_URL}/product/${encodeURIComponent(productId)}`;
+    server.use(http.get(productUrl, () =>
+      HttpResponse.json({ ...productDetailFixture, id: productId }),
     ));
 
-    await expect(getProductById(productDetailFixture.id)).resolves.toEqual(
-      productDetailFixture,
-    );
+    await expect(getProductById(productId)).resolves.toEqual({
+      ...productDetailFixture,
+      id: productId,
+    });
     expect(requests).toEqual([
-      { method: "GET", url: `${API_BASE_URL}/product/${productDetailFixture.id}` },
+      { method: "GET", url: productUrl },
     ]);
   });
 

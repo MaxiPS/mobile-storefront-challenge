@@ -13,16 +13,31 @@ describe("cartStore", () => {
     expect(Object.isFrozen(store.getSnapshot())).toBe(true);
   });
 
-  it("persists a selected variant before publishing the updated count", async () => {
+  it("publishes the cart count after the selected variant is persisted", async () => {
+    // Given the repository has not finished persisting the selected variant
     const selection = { id: "phone-1", colorCode: 1000, storageCode: 2000 };
-    const repository = { addItem: vi.fn().mockResolvedValue(2) };
+    let finishPersistence;
+    const repository = {
+      addItem: vi.fn(() => new Promise((resolve) => { finishPersistence = resolve; })),
+    };
     const store = createCartStore({ repository });
     const listener = vi.fn();
     store.subscribe(listener);
 
-    await store.addItem(selection, 1);
+    // When adding the selected variant
+    const addingItem = store.addItem(selection, 1);
 
     expect(repository.addItem).toHaveBeenCalledWith(selection, 1);
+
+    // Then keep the current count while persistence is still pending
+    expect(store.getSnapshot()).toEqual({ cartCount: 0 });
+    expect(listener).not.toHaveBeenCalled();
+
+    // When the repository confirms persistence
+    finishPersistence(2);
+    await addingItem;
+
+    // Then publish the persisted count
     expect(store.getSnapshot()).toEqual({ cartCount: 2 });
     expect(listener).toHaveBeenCalledOnce();
   });
