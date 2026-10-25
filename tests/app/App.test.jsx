@@ -11,7 +11,7 @@ const server = setupServer(
   ),
 );
 
-beforeAll(() => server.listen({ onUnhandledFrame: "error" }));
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => {
   cleanup();
   server.resetHandlers();
@@ -22,6 +22,6 @@ describe("App", () => {
   it("renders the catalog at the root route", async () => {
     render(<App />);
 
-    expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
+    expect(await screen.findByText(productsFixture[0].model)).toBeInTheDocument();
   });
 });
