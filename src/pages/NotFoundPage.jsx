@@ -7,7 +7,7 @@ import {
 
 export default function NotFoundPage() {
   return (
-    <main className="app-shell">
+    <main className="app-shell" id="main-content" tabIndex={-1}>
       <Card className="route-card">
         <CardHeader>
           <p className="eyebrow">Mobile Storefront</p>
