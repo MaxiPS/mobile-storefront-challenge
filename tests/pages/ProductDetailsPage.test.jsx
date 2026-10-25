@@ -53,6 +53,7 @@ function expectDetailRequests(count) {
 
 async function clearDatabase() {
   await db.apiCache.clear();
+  await db.cartItems.clear();
 }
 
 function renderApplication({ strict = false } = {}) {
@@ -69,7 +70,7 @@ beforeEach(async () => {
   requests = [];
   cartPayloads = [];
   await clearDatabase();
-  cartStore.setCartCount(0);
+  await cartStore.load();
 });
 
 describe("product details page", () => {
@@ -229,6 +230,29 @@ describe("product details page", () => {
       await screen.findByRole("group", { name: "Cart items: 4" }),
     ).toBeInTheDocument();
     expect(cartStore.getSnapshot().cartCount).toBe(4);
+  });
+
+  it("counts and restores local cart items when the API session count repeats", async () => {
+    const user = userEvent.setup();
+    server.use(http.post(CART_URL, () => HttpResponse.json({ count: 1 })));
+    renderApplication();
+
+    await screen.findByRole("heading", { name: "Iconia Talk S" });
+    const addButton = screen.getByRole("button", { name: "Add to cart" });
+    await user.click(addButton);
+    await user.click(addButton);
+
+    expect(
+      await screen.findByRole("group", { name: "Cart items: 2" }),
+    ).toBeInTheDocument();
+    expect(await db.cartItems.count()).toBe(2);
+
+    cleanup();
+    renderApplication();
+
+    expect(
+      await screen.findByRole("group", { name: "Cart items: 2" }),
+    ).toBeInTheDocument();
   });
 
   it("disables the add button while the cart request is pending", async () => {

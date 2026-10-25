@@ -1,16 +1,25 @@
 import { createStore } from "@/store/createStore.js";
+import { cartRepository } from "@/services/storage/cartRepository.js";
 
-export function createCartStore() {
+export function createCartStore({ repository = cartRepository } = {}) {
   const store = createStore({ cartCount: 0 });
 
-  function setCartCount(count) {
-    if (!Number.isInteger(count) || count < 0) {
-      throw new TypeError("Cart count must be a non-negative integer");
-    }
-    return store.publish({ cartCount: count });
+  async function load() {
+    const cartCount = await repository.getCount();
+    return store.publish({ cartCount });
   }
 
-  return { subscribe: store.subscribe, getSnapshot: store.getSnapshot, setCartCount };
+  async function addItem(selection, apiCount) {
+    const cartCount = await repository.addItem(selection, apiCount);
+    return store.publish({ cartCount });
+  }
+
+  return {
+    subscribe: store.subscribe,
+    getSnapshot: store.getSnapshot,
+    load,
+    addItem,
+  };
 }
 
 export const cartStore = createCartStore();
