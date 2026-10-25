@@ -55,6 +55,19 @@ describe("cartRepository", () => {
     await expect(repository.getCount()).resolves.toBe(5);
   });
 
+  it("counts concurrent additions without losing a cart item", async () => {
+    const firstSelection = { id: "phone-1", colorCode: 1000, storageCode: 2000 };
+    const secondSelection = { id: "phone-2", colorCode: 1001, storageCode: 2001 };
+
+    await Promise.all([
+      repository.addItem(firstSelection, 1),
+      repository.addItem(secondSelection, 1),
+    ]);
+
+    expect(await repository.getItems()).toHaveLength(2);
+    await expect(repository.getCount()).resolves.toBe(2);
+  });
+
   it("rejects invalid product selections and API counts", async () => {
     await expect(repository.addItem({ id: "phone-1" }, 1)).rejects.toThrow(
       TypeError,
