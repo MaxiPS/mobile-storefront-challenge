@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { http, HttpResponse } from "msw";
@@ -127,16 +127,18 @@ describe("product list page", () => {
     expect(screen.getByText("170 \u20ac")).toBeInTheDocument();
   });
 
-  it("renders the store header without a breadcrumb on the listing page", async () => {
+  it("shows the current products page in the breadcrumb", async () => {
     render(<App />);
 
     await screen.findByText("Iconia Talk S");
     expect(
       screen.getByRole("link", { name: "ITX Store home" }),
     ).toHaveAttribute("href", "/");
-    expect(
-      screen.queryByRole("navigation", { name: "breadcrumb" }),
-    ).not.toBeInTheDocument();
+    const breadcrumb = screen.getByRole("navigation", { name: "breadcrumb" });
+    expect(within(breadcrumb).getByText("Products")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
   });
 
   it("filters by model in Dexie without another API request", async () => {

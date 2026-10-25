@@ -68,5 +68,21 @@ describe("application routes", () => {
     expect(
       await screen.findByRole("heading", { name: "Iconia Talk S" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("main")).toHaveFocus();
+  });
+
+  it("supports keyboard navigation through the product list", async () => {
+    const user = userEvent.setup();
+    renderRoutes(["/"]);
+
+    await screen.findByText("Iconia Talk S");
+    await user.tab();
+    expect(screen.getByRole("link", { name: "ITX Store home" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("searchbox", { name: "Search products" })).toHaveFocus();
+    await user.tab();
+    expect(
+      screen.getByRole("link", { name: "View Acer Iconia Talk S details" }),
+    ).toHaveFocus();
   });
 });

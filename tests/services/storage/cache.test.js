@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import detail from "../../fixtures/product-detail.json";
 import products from "../../fixtures/products.json";
+import { ApiError } from "@/services/api/productsApi.js";
 import { CACHE_TTL_MS, createProductsCache } from "@/services/storage/cache.js";
 import { createTestDatabase, disposeTestDatabase } from "../../helpers/createTestDatabase.js";
 
@@ -55,9 +56,125 @@ describe("IndexedDB response cache", () => {
     expect(await cache.getProductDetail(detail.id)).toEqual({ product: detail, isStale: true });
   });
 
+  it("does not serve a stale product after the API confirms it was deleted", async () => {
+    await cache.getProductDetail(detail.id);
+    time += CACHE_TTL_MS;
+    fetchProductById.mockRejectedValueOnce(new ApiError(404));
+
+    await expect(cache.getProductDetail(detail.id)).rejects.toMatchObject({ status: 404 });
+    expect(await database.apiCache.get(`/product/${detail.id}`)).toBeUndefined();
+  });
+
+  it("fetches fresh data when reading the cache fails", async () => {
+    const apiCache = {
+      get: vi.fn().mockRejectedValue(new Error("IndexedDB read failed")),
+      put: vi.fn().mockResolvedValue(undefined),
+    };
+    const fallbackCache = createProductsCache({
+      database: { apiCache },
+      fetchProducts,
+      now: () => time,
+    });
+
+    await expect(fallbackCache.getProducts()).resolves.toEqual({
+      products,
+      isStale: false,
+    });
+    expect(fetchProducts).toHaveBeenCalledOnce();
+  });
+
+  it("returns fresh data when writing to the cache fails", async () => {
+    const staleProducts = [{ ...products[0], model: "Saved model" }];
+    const apiCache = {
+      get: vi.fn().mockResolvedValue({
+        key: "/product",
+        response: staleProducts,
+        savedAt: time - CACHE_TTL_MS,
+        expiresAt: time - 1,
+      }),
+      put: vi.fn().mockRejectedValue(new Error("IndexedDB write failed")),
+    };
+    const fallbackCache = createProductsCache({
+      database: { apiCache },
+      fetchProducts,
+      now: () => time,
+    });
+
+    await expect(fallbackCache.getProducts()).resolves.toEqual({
+      products,
+      isStale: false,
+    });
+  });
+
+  it("preserves a 404 when deleting the invalidated cache entry fails", async () => {
+    const apiCache = {
+      get: vi.fn().mockResolvedValue({
+        key: `/product/${detail.id}`,
+        response: detail,
+        savedAt: time - CACHE_TTL_MS,
+        expiresAt: time - 1,
+      }),
+      delete: vi.fn().mockRejectedValue(new Error("IndexedDB delete failed")),
+      put: vi.fn(),
+    };
+    const cacheWithDeleteFailure = createProductsCache({
+      database: { apiCache },
+      fetchProductById: vi.fn().mockRejectedValue(new ApiError(404)),
+      now: () => time,
+    });
+
+    await expect(cacheWithDeleteFailure.getProductDetail(detail.id)).rejects.toMatchObject({
+      status: 404,
+    });
+    expect(apiCache.delete).toHaveBeenCalledWith(`/product/${detail.id}`);
+  });
+
   it("rejects invalid responses without writing them", async () => {
     fetchProducts.mockResolvedValueOnce([{ id: "" }]);
     await expect(cache.getProducts()).rejects.toThrow("Product API response is invalid");
     expect(await database.apiCache.count()).toBe(0);
+  });
+
+  it("rejects an invalid product detail without caching it", async () => {
+    fetchProductById.mockResolvedValueOnce({ ...detail, id: "different-id" });
+
+    await expect(cache.getProductDetail(detail.id)).rejects.toThrow(
+      "Product API response is invalid",
+    );
+    expect(await database.apiCache.count()).toBe(0);
+  });
+
+  it("shares concurrent product list requests for the same cache key", async () => {
+    let resolveProducts;
+    fetchProducts.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveProducts = resolve; }),
+    );
+
+    const firstRequest = cache.getProducts();
+    const secondRequest = cache.getProducts();
+    await vi.waitFor(() => expect(fetchProducts).toHaveBeenCalledOnce());
+    resolveProducts(products);
+
+    await expect(Promise.all([firstRequest, secondRequest])).resolves.toEqual([
+      { products, isStale: false },
+      { products, isStale: false },
+    ]);
+  });
+
+  it("shares concurrent product detail requests for the same product", async () => {
+    let resolveProduct;
+    fetchProductById.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveProduct = resolve; }),
+    );
+
+    const firstRequest = cache.getProductDetail(detail.id);
+    const secondRequest = cache.getProductDetail(detail.id);
+    await vi.waitFor(() => expect(fetchProductById).toHaveBeenCalledOnce());
+    resolveProduct(detail);
+
+    await expect(Promise.all([firstRequest, secondRequest])).resolves.toEqual([
+      { product: detail, isStale: false },
+      { product: detail, isStale: false },
+    ]);
   });
 });

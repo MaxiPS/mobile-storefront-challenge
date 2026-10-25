@@ -232,9 +232,12 @@ describe("product details page", () => {
     expect(cartStore.getSnapshot().cartCount).toBe(4);
   });
 
-  it("counts and restores local cart items when the API session count repeats", async () => {
+  it("counts each local addition when the API session count repeats", async () => {
     const user = userEvent.setup();
-    server.use(http.post(CART_URL, () => HttpResponse.json({ count: 1 })));
+    server.use(http.post(CART_URL, async ({ request }) => {
+      cartPayloads.push(await request.json());
+      return HttpResponse.json({ count: 1 });
+    }));
     renderApplication();
 
     await screen.findByRole("heading", { name: "Iconia Talk S" });
@@ -245,14 +248,7 @@ describe("product details page", () => {
     expect(
       await screen.findByRole("group", { name: "Cart items: 2" }),
     ).toBeInTheDocument();
-    expect(await db.cartItems.count()).toBe(2);
-
-    cleanup();
-    renderApplication();
-
-    expect(
-      await screen.findByRole("group", { name: "Cart items: 2" }),
-    ).toBeInTheDocument();
+    expect(cartPayloads).toHaveLength(2);
   });
 
   it("disables the add button while the cart request is pending", async () => {
@@ -287,6 +283,20 @@ describe("product details page", () => {
     expect(
       await screen.findByRole("alert", { name: "Cart update failed" }),
     ).toHaveTextContent("We couldn't add this product. Please try again.");
+  });
+
+  it("rejects an invalid cart API response without saving the selection", async () => {
+    const user = userEvent.setup();
+    server.use(http.post(CART_URL, () => HttpResponse.json({ count: "1" })));
+    renderApplication();
+
+    await screen.findByRole("heading", { name: "Iconia Talk S" });
+    await user.click(screen.getByRole("button", { name: "Add to cart" }));
+
+    expect(
+      await screen.findByRole("alert", { name: "Cart update failed" }),
+    ).toBeInTheDocument();
+    expect(await db.cartItems.count()).toBe(0);
   });
 
   it("shows a loading state while the product detail request is pending", async () => {
@@ -339,6 +349,24 @@ describe("product details page", () => {
       "href",
       "/",
     );
+  });
+
+  it("removes an expired cached product when the API returns a 404", async () => {
+    const cacheKey = `/product/${productDetailFixture.id}`;
+    await db.apiCache.put({
+      key: cacheKey,
+      response: productDetailFixture,
+      savedAt: Date.now() - 120_000,
+      expiresAt: Date.now() - 60_000,
+    });
+    server.use(http.get(DETAIL_URL, () => HttpResponse.json({}, { status: 404 })));
+
+    renderApplication();
+
+    expect(
+      await screen.findByRole("heading", { name: "Product not found" }),
+    ).toBeInTheDocument();
+    expect(await db.apiCache.get(cacheKey)).toBeUndefined();
   });
 
   it("uses a valid cached detail without calling the API again", async () => {

@@ -115,7 +115,7 @@ export default function ProductDetailsPage() {
     <div className="storefront">
       <AppHeader breadcrumbs={breadcrumbItems} />
 
-      <main className="product-detail-page">
+      <main className="product-detail-page" id="main-content" tabIndex={-1}>
         {currentResource.status === "loading" && <LoadingState />}
 
         {(currentResource.status === "error" ||

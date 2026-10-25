@@ -125,6 +125,11 @@ button {
   outline-offset: 4px;
 }
 
+#main-content:focus-visible {
+  outline: 3px solid var(--store-accent);
+  outline-offset: 5px;
+}
+
 .cart-summary {
   position: relative;
   display: inline-flex;

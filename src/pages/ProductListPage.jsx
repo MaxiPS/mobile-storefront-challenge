@@ -16,9 +16,9 @@ export default function ProductListPage() {
 
   return (
     <div className="storefront">
-      <AppHeader />
+      <AppHeader breadcrumbs={[{ label: "Products" }]} />
 
-      <main className="product-page">
+      <main className="product-page" id="main-content" tabIndex={-1}>
         <section className="product-page__intro" aria-labelledby="product-page-title">
           <div className="product-page__heading">
             <h1 className="product-page__title" id="product-page-title">
