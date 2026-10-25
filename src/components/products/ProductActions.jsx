@@ -137,17 +137,18 @@ export default function ProductActions({ product }) {
     setRequestStatus("pending");
 
     try {
-      const result = await addProductToCart({
+      const selection = {
         id: product.id,
         colorCode: Number(colorCode),
         storageCode: Number(storageCode),
-      });
+      };
+      const result = await addProductToCart(selection);
 
       if (!Number.isInteger(result?.count) || result.count < 0) {
         throw new TypeError("Cart API response must include a valid count");
       }
 
-      cartStore.setCartCount(result.count);
+      await cartStore.addItem(selection, result.count);
       setRequestStatus("success");
     } catch {
       setRequestStatus("error");

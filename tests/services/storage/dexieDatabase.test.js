@@ -6,8 +6,8 @@ import { createAppDatabase, db } from "@/services/storage/dexieDatabase.js";
 describe("Dexie database", () => {
   it("defines the versioned application tables", () => {
     expect(db.name).toBe("itx-frontend-test");
-    expect(db.verno).toBe(2);
-    expect(db.tables.map(({ name }) => name)).toEqual(["apiCache"]);
+    expect(db.verno).toBe(3);
+    expect(db.tables.map(({ name }) => name)).toEqual(["apiCache", "cartItems"]);
   });
 
   it("indexes cache expiration and uses endpoint keys", () => {
@@ -34,8 +34,12 @@ describe("Dexie database", () => {
     const upgraded = createAppDatabase(name);
     try {
       await upgraded.open();
-      expect(upgraded.tables.map(({ name: tableName }) => tableName)).toEqual(["apiCache"]);
+      expect(upgraded.tables.map(({ name: tableName }) => tableName)).toEqual([
+        "apiCache",
+        "cartItems",
+      ]);
       expect((await upgraded.apiCache.get("/product")).response).toEqual([{ id: "1" }]);
+      expect(await upgraded.cartItems.count()).toBe(0);
     } finally {
       upgraded.close();
       await upgraded.delete();

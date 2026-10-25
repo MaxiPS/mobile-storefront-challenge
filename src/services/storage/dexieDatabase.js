@@ -16,6 +16,13 @@ export function createAppDatabase(name = DATABASE_NAME) {
     productDetails: null,
     appState: null,
   });
+  database.version(3).stores({
+    apiCache: "&key, expiresAt",
+    products: null,
+    productDetails: null,
+    appState: null,
+    cartItems: "++id, productId, addedAt",
+  });
   return database;
 }
 

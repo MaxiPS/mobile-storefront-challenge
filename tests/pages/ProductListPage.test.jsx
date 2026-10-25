@@ -46,6 +46,7 @@ function expectProductRequests(count) {
 
 async function clearDatabase() {
   await db.apiCache.clear();
+  await db.cartItems.clear();
 }
 
 async function seedProductCache(products, expiresAt) {
@@ -86,7 +87,7 @@ function mockProductRowMeasurements(rowHeight) {
 beforeEach(async () => {
   requests = [];
   await clearDatabase();
-  cartStore.setCartCount(0);
+  await cartStore.load();
   await productListStore.setSearchTerm("");
 });
 
@@ -314,7 +315,10 @@ describe("product list page", () => {
   });
 
   it("shows the cart count in the shared header", async () => {
-    cartStore.setCartCount(3);
+    await cartStore.addItem(
+      { id: "test-product", colorCode: 1000, storageCode: 2000 },
+      3,
+    );
 
     render(<App />);
 

@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ChevronRight, ShoppingCart } from "lucide-react";
 import {
@@ -10,9 +10,14 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb.jsx";
 import { useCartStore } from "@/hooks/useCartStore.js";
+import { cartStore } from "@/store/cartStore.js";
 
 export default function AppHeader({ breadcrumbs = [] }) {
   const { cartCount } = useCartStore();
+
+  useEffect(() => {
+    void cartStore.load();
+  }, []);
 
   return (
     <header className="site-header">

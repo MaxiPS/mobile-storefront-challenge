@@ -10,11 +10,13 @@ import { createProductListStore } from "@/store/productListStore.js";
 afterEach(cleanup);
 
 describe("external store hooks", () => {
-  it("subscribes to cart snapshots", () => {
-    const cart = createCartStore();
+  it("subscribes to cart snapshots", async () => {
+    const cart = createCartStore({
+      repository: { getCount: async () => 2 },
+    });
     const { result } = renderHook(() => useCartStore(cart));
 
-    act(() => cart.setCartCount(2));
+    await act(async () => { await cart.load(); });
 
     expect(result.current.cartCount).toBe(2);
   });
