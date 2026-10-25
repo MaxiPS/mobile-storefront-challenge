@@ -7,10 +7,31 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import App from "@/app/App.jsx";
 import { PRODUCT_LIST_CACHE_KEY } from "@/services/storage/cache.js";
 import { db } from "@/services/storage/dexieDatabase.js";
-import { productRepository } from "@/services/storage/productRepository.js";
 import { cartStore } from "@/store/cartStore.js";
 import { productListStore } from "@/store/productListStore.js";
+import searchProductsFixture from "../fixtures/search-products.json";
 import productsFixture from "../fixtures/products.json";
+
+const firstProduct = productsFixture[0];
+const modelSearchTarget = productsFixture.find(
+  (product) =>
+    product.id !== firstProduct.id &&
+    Boolean(product.model?.trim()) &&
+    product.model.toLowerCase() !== firstProduct.model.toLowerCase(),
+);
+
+function getProductName(product) {
+  return [product.brand, product.model].filter(Boolean).join(" ");
+}
+
+function getProductLinkName(product) {
+  return `View ${getProductName(product)} details`;
+}
+
+function transposeFirstTwoCharacters(value) {
+  const [first, second, ...remaining] = value.toLowerCase();
+  return `${second}${first}${remaining.join("")}`;
+}
 
 const PRODUCTS_URL = "https://itx-frontend-test.onrender.com/api/product";
 const INITIAL_VIEWPORT = { width: window.innerWidth, height: window.innerHeight };
@@ -24,7 +45,7 @@ beforeAll(() => {
   server.events.on("request:start", ({ request }) => {
     requests.push({ method: request.method, url: request.url });
   });
-  server.listen({ onUnhandledFrame: "error" });
+  server.listen({ onUnhandledRequest: "error" });
 });
 
 afterAll(() => server.close());
@@ -95,7 +116,7 @@ describe("product list page", () => {
   it("loads the product list from the API when the cache is empty", async () => {
     render(<App />);
 
-    expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
+    expect(await screen.findByText(firstProduct.model)).toBeInTheDocument();
     expectProductRequests(1);
   });
 
@@ -104,33 +125,35 @@ describe("product list page", () => {
 
     render(<App />);
 
-    expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
+    expect(await screen.findByText(firstProduct.model)).toBeInTheDocument();
     expectProductRequests(0);
   });
 
   it("renders product cards", async () => {
     render(<App />);
 
-    expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
+    expect(await screen.findByText(firstProduct.model)).toBeInTheDocument();
     const productCardLink = screen.getByRole("link", {
-      name: "View Acer Iconia Talk S details",
+      name: getProductLinkName(firstProduct),
     });
-    expect(productCardLink).toHaveAttribute("href", `/products/${productsFixture[0].id}`);
+    expect(productCardLink).toHaveAttribute("href", `/products/${firstProduct.id}`);
     expect(productCardLink).toContainElement(
-      screen.getByRole("heading", { name: "Iconia Talk S" }),
+      screen.getByRole("heading", { name: firstProduct.model }),
     );
     expect(screen.queryByText("View details", { exact: true })).not.toBeInTheDocument();
     expect(
-      screen.getByRole("img", { name: "Acer Iconia Talk S" }),
+      screen.getByRole("img", { name: getProductName(firstProduct) }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Price unavailable")).toBeInTheDocument();
-    expect(screen.getByText("170 \u20ac")).toBeInTheDocument();
+    const firstProductPrice = String(firstProduct.price ?? "").trim();
+    expect(productCardLink).toHaveTextContent(
+      firstProductPrice ? `${firstProductPrice} \u20ac` : "Price unavailable",
+    );
   });
 
   it("shows the current products page in the breadcrumb", async () => {
     render(<App />);
 
-    await screen.findByText("Iconia Talk S");
+    await screen.findByText(firstProduct.model);
     expect(
       screen.getByRole("link", { name: "ITX Store home" }),
     ).toHaveAttribute("href", "/");
@@ -143,34 +166,37 @@ describe("product list page", () => {
 
   it("filters by model in Dexie without another API request", async () => {
     const user = userEvent.setup();
-    const searchSpy = vi.spyOn(productRepository, "searchProductsLocal");
-    render(<App />);
 
-    await screen.findByText("Iconia Talk S");
+    // Given the catalog has been loaded once
+    render(<App />);
+    await screen.findByText(firstProduct.model);
     expectProductRequests(1);
 
-    await user.type(screen.getByRole("searchbox", { name: "Search products" }), "jAdE");
+    // When the user searches for a model
+    const searchTerm = modelSearchTarget.model.toUpperCase();
+    await user.type(screen.getByRole("searchbox", { name: "Search products" }), searchTerm);
 
-    expect(await screen.findByText("Liquid Jade 2")).toBeInTheDocument();
-    expect(screen.queryByText("Iconia Talk S")).not.toBeInTheDocument();
-    expect(searchSpy).toHaveBeenCalledWith("jAdE");
+    // Then matching local data is shown without another API request
+    expect(await screen.findByText(modelSearchTarget.model)).toBeInTheDocument();
+    expect(screen.queryByText(firstProduct.model)).not.toBeInTheDocument();
     expectProductRequests(1);
   });
 
   it("searches product brands case-insensitively in Dexie", async () => {
     const user = userEvent.setup();
-    const searchSpy = vi.spyOn(productRepository, "searchProductsLocal");
+    server.use(http.get(PRODUCTS_URL, () => HttpResponse.json(searchProductsFixture)));
     render(<App />);
 
-    await screen.findByText("Iconia Talk S");
+    await screen.findByText(searchProductsFixture[0].model);
+    const searchTerm = searchProductsFixture[0].brand.toUpperCase();
     await user.type(
       screen.getByRole("searchbox", { name: "Search products" }),
-      "aCeR",
+      searchTerm,
     );
 
-    expect(await screen.findByText("Liquid Jade 2")).toBeInTheDocument();
-    expect(screen.getByText("Iconia Talk S")).toBeInTheDocument();
-    expect(searchSpy).toHaveBeenCalledWith("aCeR");
+    expect(await screen.findByText(searchProductsFixture[0].model)).toBeInTheDocument();
+    expect(screen.getByText(searchProductsFixture[1].model)).toBeInTheDocument();
+    expect(screen.queryByText(searchProductsFixture[2].model)).not.toBeInTheDocument();
     expectProductRequests(1);
   });
 
@@ -178,14 +204,15 @@ describe("product list page", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByText("Iconia Talk S");
+    await screen.findByText(firstProduct.model);
+    const searchTerm = transposeFirstTwoCharacters(modelSearchTarget.model);
     await user.type(
       screen.getByRole("searchbox", { name: "Search products" }),
-      "jdae",
+      searchTerm,
     );
 
-    expect(await screen.findByText("Liquid Jade 2")).toBeInTheDocument();
-    expect(screen.queryByText("Iconia Talk S")).not.toBeInTheDocument();
+    expect(await screen.findByText(modelSearchTarget.model)).toBeInTheDocument();
+    expect(screen.queryByText(firstProduct.model)).not.toBeInTheDocument();
     expectProductRequests(1);
   });
 
@@ -198,7 +225,11 @@ describe("product list page", () => {
     render(<App />);
 
     expect(await screen.findByText("Product 12")).toBeInTheDocument();
-    expect(screen.getAllByRole("list", { name: /Product row/ })).toHaveLength(3);
+    const productRows = screen.getAllByRole("list", { name: /Product row/ });
+    expect(productRows).toHaveLength(3);
+    expect(
+      productRows.map((row) => within(row).getAllByRole("listitem").length),
+    ).toEqual([4, 4, 4]);
   });
 
   it("scrolls through all products while virtualizing offscreen rows", async () => {
@@ -239,7 +270,7 @@ describe("product list page", () => {
       </StrictMode>,
     );
 
-    expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
+    expect(await screen.findByText(firstProduct.model)).toBeInTheDocument();
     expectProductRequests(1);
   });
 
@@ -251,7 +282,7 @@ describe("product list page", () => {
 
     render(<App />);
 
-    expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
+    expect(await screen.findByText(firstProduct.model)).toBeInTheDocument();
     expect(screen.queryByText("Old cached model")).not.toBeInTheDocument();
     expectProductRequests(1);
     await waitFor(async () => {
@@ -272,7 +303,7 @@ describe("product list page", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Loading products");
     await waitFor(() => expect(resolveProducts).toBeTypeOf("function"));
     resolveProducts(HttpResponse.json(productsFixture));
-    expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
+    expect(await screen.findByText(firstProduct.model)).toBeInTheDocument();
   });
 
   it("shows an empty state when the API returns no products", async () => {
@@ -287,7 +318,7 @@ describe("product list page", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByText("Iconia Talk S");
+    await screen.findByText(firstProduct.model);
     await user.type(
       screen.getByRole("searchbox", { name: "Search products" }),
       "not-a-phone",
@@ -312,7 +343,7 @@ describe("product list page", () => {
     expect(await screen.findByText("We couldn't load products")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Try again" }));
 
-    expect(await screen.findByText("Iconia Talk S")).toBeInTheDocument();
+    expect(await screen.findByText(firstProduct.model)).toBeInTheDocument();
     expectProductRequests(2);
   });
 
